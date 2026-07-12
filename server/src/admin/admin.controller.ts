@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -51,6 +52,11 @@ export class AdminController {
   updateProduct(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
     return this.admin.updateProduct(id, body);
   }
+  @Delete('products/:id')
+  @Perm('products')
+  deleteProduct(@Param('id', ParseIntPipe) id: number) {
+    return this.admin.deleteProduct(id);
+  }
 
   // ---------- 套餐 ----------
   @Get('plans')
@@ -67,6 +73,11 @@ export class AdminController {
   @Perm('products')
   updatePlan(@Param('id', ParseIntPipe) id: number, @Body() body: any) {
     return this.admin.updatePlan(id, body);
+  }
+  @Delete('plans/:id')
+  @Perm('products')
+  deletePlan(@Param('id', ParseIntPipe) id: number) {
+    return this.admin.deletePlan(id);
   }
 
   // ---------- 定价 ----------
@@ -126,6 +137,14 @@ export class AdminController {
   @Perm('users')
   listUsers() {
     return this.admin.listUsers();
+  }
+  @Patch('users/:id/level')
+  @Perm('users')
+  setUserLevel(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { level: number | null },
+  ) {
+    return this.admin.setUserLevel(id, body.level ?? null);
   }
   @Patch('users/:id/status')
   @Perm('users')

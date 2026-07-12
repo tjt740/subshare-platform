@@ -28,6 +28,10 @@ export class User {
   @Column({ type: 'text', default: '[]' }) permissions: string; // JSON string[]
   @Column({ type: 'text', default: 'active' }) status: 'active' | 'banned';
   @Column({ type: 'real', default: 0 }) balance: number; // 钱包余额（USD）
+  /** 成长值：累计充值+消费（USD），驱动用户等级 */
+  @Column({ type: 'real', default: 0 }) growthUsd: number;
+  /** 等级人工覆盖（后台设置；null=按成长值自动计算） */
+  @Column({ type: 'integer', nullable: true }) levelOverride: number | null;
   @CreateDateColumn() createdAt: Date;
 }
 
@@ -276,6 +280,28 @@ export const convert = (amount: number, from: string, to: string) =>
     : Math.round(
         ((amount * (FX_TO_USD[from] ?? 1)) / (FX_TO_USD[to] ?? 1)) * 100,
       ) / 100;
+
+/** 用户等级阈值（成长值 USD）：等级越高越尊贵 */
+export const LEVELS = [
+  { lv: 1, need: 0 },
+  { lv: 2, need: 50 },
+  { lv: 3, need: 150 },
+  { lv: 4, need: 400 },
+  { lv: 5, need: 1000 },
+] as const;
+export function computeLevel(growthUsd: number): number {
+  let lv = 1;
+  for (const item of LEVELS) if (growthUsd >= item.need) lv = item.lv;
+  return lv;
+}
+export function effectiveLevel(user: { growthUsd?: number; levelOverride?: number | null }): number {
+  if (user.levelOverride && user.levelOverride >= 1 && user.levelOverride <= 5) return user.levelOverride;
+  return computeLevel(user.growthUsd ?? 0);
+}
+export function nextLevelAt(level: number): number | null {
+  const next = LEVELS.find((x) => x.lv === level + 1);
+  return next ? next.need : null;
+}
 
 /** 子管理员可分配的后台权限 */
 export const ADMIN_PERMISSIONS = [

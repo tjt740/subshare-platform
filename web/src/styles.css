@@ -932,6 +932,66 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
 .as-item b { min-width: 180px; font-weight: 800; }
 .as-item span:not(.badge) { flex: 1; color: var(--muted); font-weight: 600; }
 
+/* ===== 用户等级（越高越尊贵） ===== */
+@keyframes lvGlow { 0%,100% { box-shadow: 0 0 5px rgba(245,158,11,.35); } 50% { box-shadow: 0 0 16px rgba(245,158,11,.9); } }
+@keyframes lvName { to { background-position: 200% 0; } }
+@keyframes salePulse { 0%,100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.user-email { display: inline-flex; align-items: center; gap: 7px; border-bottom: none; cursor: pointer; }
+.lv-ring {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; font-style: normal;
+  display: inline-flex; align-items: center; justify-content: center; font-size: 16px;
+  border: 2px solid var(--muted); background: var(--card);
+}
+.lv-ring.big { width: 56px; height: 56px; font-size: 28px; }
+.lv-ring.lv2 { border-color: #9ca3af; box-shadow: 0 0 0 2.5px #d7dbe2; }
+.lv-ring.lv3 { border-color: #f59e0b; box-shadow: 0 0 0 2.5px #fde68a; }
+.lv-ring.lv4 {
+  border: 2px solid transparent;
+  background: linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(135deg, #67e8f9, #a78bfa, #f0abfc) border-box;
+  box-shadow: 0 0 10px rgba(167, 139, 250, 0.55);
+}
+.lv-ring.lv5 {
+  border: 2px solid transparent;
+  background: linear-gradient(var(--card), var(--card)) padding-box,
+    linear-gradient(135deg, #fbbf24, #1c1917, #fbbf24) border-box;
+  animation: lvGlow 2.2s ease infinite;
+}
+.lv-name.lv3 { color: #b45309; }
+.lv-name.lv4 {
+  background: linear-gradient(90deg, #0891b2, #7c3aed, #0891b2); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.lv-name.lv5 {
+  background: linear-gradient(90deg, #f59e0b, #ef4444, #f59e0b); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: lvName 3s linear infinite;
+}
+.lv-name.lv5::after { content: '👑'; -webkit-text-fill-color: initial; margin-left: 3px; }
+.lv-badge {
+  font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 999px;
+  border: 1.5px solid currentColor; font-style: normal; line-height: 1.5;
+  -webkit-text-fill-color: initial;
+}
+.lv-badge.lv1 { color: var(--muted); }
+.lv-badge.lv2 { color: #6b7280; background: #eceef2; }
+.lv-badge.lv3 { color: #b45309; background: #fef3c7; }
+.lv-badge.lv4 { color: #7c3aed; background: #ede9fe; }
+.lv-badge.lv5 { color: #fbbf24; background: #1c1917; border-color: #fbbf24; }
+.level-card .level-head { display: flex; align-items: center; gap: 14px; margin-bottom: 14px; }
+.level-card.lv5 { border-color: #fbbf24; }
+
+/* ===== 特惠倒计时 ===== */
+.sale-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--red); color: #fff; border: 1.5px solid var(--ink);
+  border-radius: 999px; padding: 3px 12px; font-size: 12px; font-weight: 800;
+  font-variant-numeric: tabular-nums; animation: salePulse 1.6s ease infinite;
+  white-space: nowrap;
+}
+.sale-chip.on-card { position: absolute; left: 14px; bottom: 8px; z-index: 1; font-size: 11px; padding: 2px 10px; }
+.sale-chip.detail-sale { margin-bottom: 14px; font-size: 13.5px; padding: 6px 16px; }
+
 /* 头像选择 */
 .avatar-grid { display: flex; flex-wrap: wrap; gap: 9px; }
 .avatar-chip {

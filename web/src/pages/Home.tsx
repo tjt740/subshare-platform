@@ -10,7 +10,7 @@ import {
 } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
-import { Marquee, Reveal } from '../components/fx';
+import { Marquee, Reveal, SaleCountdown } from '../components/fx';
 
 interface ProductCard {
   id: number;
@@ -25,6 +25,7 @@ interface ProductCard {
   fromPrice: number;
   currency: string;
   totalStock: number;
+  sale?: { endsAt: string; label?: string } | null;
 }
 
 function savePercent(p: ProductCard) {
@@ -152,6 +153,7 @@ export default function Home() {
                     </span>
                   </div>
                   {p.badge && <span className="badge-float">{p.badge}</span>}
+                  <SaleCountdown endsAt={p.sale?.endsAt} label={p.sale?.label} className="on-card" />
                 </div>
                 <div className="card-body">
                   <h3>{p.title}</h3>

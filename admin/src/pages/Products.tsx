@@ -7,6 +7,7 @@ import {
   Input,
   InputNumber,
   Modal,
+  Popconfirm,
   Select,
   Space,
   Switch,
@@ -87,7 +88,7 @@ export default function Products() {
   async function saveProduct() {
     const values = await productForm.validateFields();
     // 交付/售后配置合并进 meta（前台商品页/订阅卡实时展示 -> 前后台连贯）
-    const { deliveryMethod, deliveryTime, warranty, ...rest } = values;
+    const { deliveryMethod, deliveryTime, warranty, saleEndsAt, saleLabel, ...rest } = values;
     const meta = parseMeta(editingProduct?.meta);
     meta.delivery = {
       ...(meta.delivery || {}),
@@ -95,6 +96,14 @@ export default function Products() {
       time: deliveryTime || meta.delivery?.time || '支付后自动交付',
     };
     if (warranty !== undefined) meta.warranty = warranty;
+    if (saleEndsAt) {
+      meta.sale = {
+        endsAt: new Date(saleEndsAt).toISOString(),
+        label: saleLabel || '⚡ 限时特惠',
+      };
+    } else {
+      delete meta.sale;
+    }
     const payload = { ...rest, meta: JSON.stringify(meta) };
     try {
       if (editingProduct) {
@@ -239,11 +248,18 @@ export default function Products() {
                   onClick={() => {
                     setEditingProduct(row);
                     const meta = parseMeta(row.meta);
+                    const saleIso = meta.sale?.endsAt;
                     productForm.setFieldsValue({
                       ...row,
                       deliveryMethod: meta.delivery?.method,
                       deliveryTime: meta.delivery?.time,
                       warranty: meta.warranty,
+                      saleLabel: meta.sale?.label,
+                      saleEndsAt: saleIso
+                        ? new Date(new Date(saleIso).getTime() - new Date().getTimezoneOffset() * 60000)
+                            .toISOString()
+                            .slice(0, 16)
+                        : undefined,
                     });
                     setProductModal(true);
                   }}
@@ -261,6 +277,22 @@ export default function Products() {
                 >
                   套餐与定价
                 </Button>
+                <Popconfirm
+                  title="删除商品及其全部套餐/定价/库存？有订单引用将被拒绝"
+                  onConfirm={async () => {
+                    try {
+                      await api(`/admin/products/${row.id}`, { method: 'DELETE' });
+                      message.success('商品已删除');
+                      loadProducts();
+                    } catch (e: any) {
+                      message.error(e.message);
+                    }
+                  }}
+                >
+                  <Button size="small" danger>
+                    删除
+                  </Button>
+                </Popconfirm>
               </Space>
             ),
           },
@@ -314,6 +346,15 @@ export default function Products() {
           </Form.Item>
           <Form.Item label="质保/售后政策" name="warranty">
             <Input placeholder="有效期内封号免费补发，工单 2 小时内响应" />
+          </Form.Item>
+          <div style={{ borderTop: '1px dashed #ddd', margin: '4px 0 14px', paddingTop: 10, fontWeight: 700, fontSize: 13 }}>
+            ⏳ 特惠倒计时（前台商品卡与详情页展示）
+          </div>
+          <Form.Item label="特惠截止时间（留空=关闭特惠）" name="saleEndsAt">
+            <Input type="datetime-local" />
+          </Form.Item>
+          <Form.Item label="特惠标签" name="saleLabel">
+            <Input placeholder="⚡ 限时特惠" />
           </Form.Item>
         </Form>
       </Modal>
@@ -415,6 +456,23 @@ export default function Products() {
                   <Button size="small" type="primary" ghost onClick={() => openPricing(plan)}>
                     定价
                   </Button>
+                  <Popconfirm
+                    title="删除该套餐(SKU)及其定价/库存？有订单引用将被拒绝"
+                    onConfirm={async () => {
+                      try {
+                        await api(`/admin/plans/${plan.id}`, { method: 'DELETE' });
+                        message.success('套餐已删除');
+                        drawerProduct && loadPlans(drawerProduct.id);
+                        loadProducts();
+                      } catch (e: any) {
+                        message.error(e.message);
+                      }
+                    }}
+                  >
+                    <Button size="small" danger>
+                      删
+                    </Button>
+                  </Popconfirm>
                 </Space>
               ),
             },

@@ -53,6 +53,7 @@ export class PaymentsService {
         );
       }
       user.balance = Math.round((user.balance - usd) * 100) / 100;
+      user.growthUsd = Math.round(((user.growthUsd ?? 0) + usd) * 100) / 100;
       await this.users.save(user);
       await this.txns.save(
         this.txns.create({
@@ -166,6 +167,7 @@ export class PaymentsService {
       const user = await this.users.findOneBy({ id: userId });
       if (user) {
         user.balance = Math.round((user.balance + payment.amount) * 100) / 100;
+        user.growthUsd = Math.round(((user.growthUsd ?? 0) + payment.amount) * 100) / 100;
         await this.users.save(user);
         await this.txns.save(
           this.txns.create({
@@ -187,6 +189,12 @@ export class PaymentsService {
       order.status = 'paid';
       order.paidAt = new Date();
       await this.orders.save(order);
+      const payer = await this.users.findOneBy({ id: userId });
+      if (payer) {
+        payer.growthUsd =
+          Math.round(((payer.growthUsd ?? 0) + toUsd(order.amount, order.currency)) * 100) / 100;
+        await this.users.save(payer);
+      }
       await this.fulfillment.fulfill(order);
     }
     return this.result(payment);

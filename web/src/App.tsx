@@ -92,8 +92,13 @@ function Header() {
                 >
                   💰 ${user.balance.toFixed(2)}
                 </span>
-                <span className="user-email" onClick={() => navigate('/account?tab=profile')}>
-                  {user.avatar ?? '😀'} {user.nickname || user.email}
+                <span
+                  className={`user-email lv-name lv${user.level ?? 1}`}
+                  onClick={() => navigate('/account?tab=profile')}
+                >
+                  <i className={`lv-ring lv${user.level ?? 1}`}>{user.avatar ?? '😀'}</i>
+                  {user.nickname || user.email}
+                  <b className={`lv-badge lv${user.level ?? 1}`}>LV{user.level ?? 1}</b>
                 </span>
                 <button className="btn btn-ghost btn-sm" onClick={logout}>
                   {t('auth.logout')}

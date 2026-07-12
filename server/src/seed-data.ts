@@ -310,6 +310,13 @@ export async function runSeed(ds: DataSource) {
 
   for (const entry of catalog) {
     const { meta, ...productData } = entry.product;
+    // 演示：热销品挂 48 小时特惠倒计时
+    if (productData.slug === 'streammax-premium') {
+      meta.sale = {
+        endsAt: new Date(Date.now() + 48 * 3600 * 1000).toISOString(),
+        label: '⚡ 限时特惠',
+      };
+    }
     const product = await products.save(
       products.create({
         ...productData,

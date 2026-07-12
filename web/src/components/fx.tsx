@@ -133,6 +133,41 @@ export const THEMES = [
   { id: 'coffee', name: '复古咖啡', desc: '温暖 · 复古 · 焦糖', dots: ['#a0522d', '#d4a373', '#efe6da'] },
 ];
 
+/* ============ 特惠倒计时 ============ */
+export function SaleCountdown({
+  endsAt,
+  label,
+  className = '',
+}: {
+  endsAt?: string | null;
+  label?: string | null;
+  className?: string;
+}) {
+  const { t } = useI18n();
+  const [left, setLeft] = useState(() =>
+    endsAt ? new Date(endsAt).getTime() - Date.now() : 0,
+  );
+  useEffect(() => {
+    if (!endsAt) return;
+    setLeft(new Date(endsAt).getTime() - Date.now());
+    const timer = setInterval(
+      () => setLeft(new Date(endsAt).getTime() - Date.now()),
+      1000,
+    );
+    return () => clearInterval(timer);
+  }, [endsAt]);
+  if (!endsAt || left <= 0) return null;
+  const s = Math.floor(left / 1000);
+  const d = Math.floor(s / 86400);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const tstr = `${d > 0 ? d + 'd ' : ''}${pad(Math.floor((s % 86400) / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
+  return (
+    <span className={`sale-chip ${className}`}>
+      {label || t('sale.default')} ⏳ {tstr}
+    </span>
+  );
+}
+
 /* ============ 表盘时钟（24h 语义下的模拟表盘，本地时区） ============ */
 export function AnalogClock({ size = 66 }: { size?: number }) {
   const [now, setNow] = useState(() => new Date());

@@ -95,6 +95,7 @@ export class CatalogService {
         soldCount: p.soldCount,
         badge: meta.badge ?? null,
         officialPriceUsd: meta.officialPriceUsd ?? null,
+        sale: meta.sale ?? null, // {endsAt, label} 特惠倒计时
         fromPrice: cheapest.price,
         currency: cheapest.currency,
         totalStock: plans.reduce((s, v) => s + v.stock, 0),

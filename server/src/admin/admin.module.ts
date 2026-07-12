@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   InventoryAccount,
   Order,
+  OrderItem,
   Payment,
   Plan,
   PriceBook,
@@ -30,6 +31,7 @@ import { OrdersModule } from '../orders/orders.module';
       InventoryAccount,
       Slot,
       Order,
+      OrderItem,
       Payment,
       Subscription,
       Ticket,

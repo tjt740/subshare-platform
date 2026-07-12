@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, CATEGORY_ICON, money, starStr, toUsd } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
-import { Reveal } from '../components/fx';
+import { Reveal, SaleCountdown } from '../components/fx';
 
 interface PlanView {
   id: number;
@@ -29,6 +29,7 @@ interface Detail {
     faq?: { q: string; a: string }[];
     reviews?: { user: string; rating: number; date: string; content: string }[];
     delivery?: { method: string; time: string; steps?: string[] };
+    sale?: { endsAt: string; label?: string } | null;
     warranty?: string;
     aftersales?: { issue: string; way: string; sla: string }[];
   };
@@ -218,6 +219,11 @@ export default function ProductDetail() {
         </div>
 
         <div className="detail-buy">
+          <SaleCountdown
+            endsAt={meta.sale?.endsAt}
+            label={meta.sale?.label}
+            className="detail-sale"
+          />
           <h3>{t('detail.choosePlan')}</h3>
           <div className="plan-list">
             {detail.plans.map((p) => (

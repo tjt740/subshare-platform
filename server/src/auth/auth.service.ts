@@ -7,7 +7,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { User } from '../entities';
+import { effectiveLevel, nextLevelAt, User } from '../entities';
 
 @Injectable()
 export class AuthService {
@@ -38,6 +38,7 @@ export class AuthService {
     } catch {
       permissions = [];
     }
+    const level = effectiveLevel(user);
     return {
       id: user.id,
       email: user.email,
@@ -46,6 +47,9 @@ export class AuthService {
       role: user.role,
       permissions,
       balance: user.balance,
+      level,
+      growthUsd: Math.round((user.growthUsd ?? 0) * 100) / 100,
+      nextLevelAt: nextLevelAt(level),
       createdAt: user.createdAt,
     };
   }

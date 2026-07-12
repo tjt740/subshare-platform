@@ -587,6 +587,47 @@ export default function Account() {
       {/* ---------------- 个人资料 ---------------- */}
       {tab === 'profile' && user && (
         <div className="checkout-wrap" style={{ marginTop: 4 }}>
+          <div className={`panel level-card lv${user.level ?? 1}`}>
+            <h3>{t('profile.levelTitle')}</h3>
+            <div className="level-head">
+              <i className={`lv-ring big lv${user.level ?? 1}`}>{user.avatar ?? '😀'}</i>
+              <div>
+                <b className={`lv-name lv${user.level ?? 1}`} style={{ fontSize: 18 }}>
+                  {t(`lv.${user.level ?? 1}`)}
+                  <span className={`lv-badge lv${user.level ?? 1}`} style={{ marginLeft: 8 }}>
+                    LV{user.level ?? 1}
+                  </span>
+                </b>
+                <div className="muted small">
+                  {t('profile.growth')} ${Number(user.growthUsd ?? 0).toFixed(2)}
+                </div>
+              </div>
+            </div>
+            <div className="progress-wrap" style={{ marginBottom: 0 }}>
+              <div className="progress-info">
+                <span>
+                  {user.nextLevelAt != null
+                    ? t('profile.next', {
+                        n: Math.max(0, user.nextLevelAt - (user.growthUsd ?? 0)).toFixed(2),
+                        name: t(`lv.${(user.level ?? 1) + 1}`),
+                      })
+                    : t('profile.max')}
+                </span>
+                <b>
+                  {user.nextLevelAt != null
+                    ? `${Math.min(100, Math.round(((user.growthUsd ?? 0) / user.nextLevelAt) * 100))}%`
+                    : '100%'}
+                </b>
+              </div>
+              <div className="progress-bar">
+                <i
+                  style={{
+                    width: `${user.nextLevelAt != null ? Math.min(100, ((user.growthUsd ?? 0) / user.nextLevelAt) * 100) : 100}%`,
+                  }}
+                />
+              </div>
+            </div>
+          </div>
           <div className="panel">
             <h3>{t('profile.title')}</h3>
             <label className="field">

@@ -8,8 +8,11 @@ import { In, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import {
   ADMIN_PERMISSIONS,
+  computeLevel,
+  effectiveLevel,
   InventoryAccount,
   Order,
+  OrderItem,
   Payment,
   Plan,
   PriceBook,
@@ -37,6 +40,8 @@ export class AdminService {
     private readonly accounts: Repository<InventoryAccount>,
     @InjectRepository(Slot) private readonly slots: Repository<Slot>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
+    @InjectRepository(OrderItem)
+    private readonly orderItems: Repository<OrderItem>,
     @InjectRepository(Payment) private readonly payments: Repository<Payment>,
     @InjectRepository(Subscription)
     private readonly subs: Repository<Subscription>,
@@ -96,6 +101,45 @@ export class AdminService {
     const exists = await this.products.findOneBy({ slug: data.slug });
     if (exists) throw new BadRequestException('slug 已存在');
     return this.products.save(this.products.create(data));
+  }
+
+  /** 删除商品：级联清理套餐/价格/库存坑位；有订单引用则拒绝（建议下架） */
+  async deleteProduct(id: number) {
+    const product = await this.products.findOneBy({ id });
+    if (!product) throw new NotFoundException('商品不存在');
+    const plans = await this.plans.findBy({ productId: id });
+    for (const plan of plans) await this.assertPlanDeletable(plan.id);
+    for (const plan of plans) await this.removePlanCascade(plan.id);
+    await this.products.delete({ id });
+    return { ok: true };
+  }
+
+  /** 删除套餐(SKU)：有订单引用则拒绝 */
+  async deletePlan(id: number) {
+    const plan = await this.plans.findOneBy({ id });
+    if (!plan) throw new NotFoundException('套餐不存在');
+    await this.assertPlanDeletable(id);
+    await this.removePlanCascade(id);
+    return { ok: true };
+  }
+
+  private async assertPlanDeletable(planId: number) {
+    const refs = await this.orderItems.countBy({ planId });
+    if (refs > 0) {
+      throw new BadRequestException(
+        '该套餐已有订单引用，不能删除；如需停售请下架（保留历史数据）',
+      );
+    }
+  }
+
+  private async removePlanCascade(planId: number) {
+    const accounts = await this.accounts.findBy({ planId });
+    for (const account of accounts) {
+      await this.slots.delete({ accountId: account.id });
+    }
+    await this.accounts.delete({ planId });
+    await this.prices.delete({ planId });
+    await this.plans.delete({ id: planId });
   }
 
   async updateProduct(id: number, data: Partial<Product>) {
@@ -314,8 +358,28 @@ export class AdminService {
       role: u.role,
       status: u.status,
       balance: u.balance,
+      growthUsd: Math.round((u.growthUsd ?? 0) * 100) / 100,
+      level: effectiveLevel(u),
+      autoLevel: computeLevel(u.growthUsd ?? 0),
+      levelOverride: u.levelOverride ?? null,
       createdAt: u.createdAt,
     }));
+  }
+
+  /** 后台改等级：1-5 人工覆盖；null 恢复按成长值自动 */
+  async setUserLevel(id: number, level: number | null) {
+    const user = await this.users.findOneBy({ id });
+    if (!user) throw new NotFoundException('用户不存在');
+    if (level !== null && (level < 1 || level > 5)) {
+      throw new BadRequestException('等级需在 1-5 之间');
+    }
+    user.levelOverride = level;
+    await this.users.save(user);
+    return {
+      id: user.id,
+      level: effectiveLevel(user),
+      levelOverride: user.levelOverride,
+    };
   }
 
   async setUserStatus(id: number, status: 'active' | 'banned') {
