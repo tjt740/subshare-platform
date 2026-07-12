@@ -1,0 +1,22 @@
+{
+  "name": "subshare-platform",
+  "version": "0.1.0",
+  "private": true,
+  "description": "订阅共享平台（GamsGo 同类）Monorepo：server(NestJS) + web(React 用户前台) + admin(React 管理后台)",
+  "workspaces": [
+    "server",
+    "web",
+    "admin"
+  ],
+  "scripts": {
+    "seed": "npm -w server run seed",
+    "dev": "concurrently -n server,web,admin -c blue,green,magenta \"npm -w server run dev\" \"npm -w web run dev\" \"npm -w admin run dev\"",
+    "dev:server": "npm -w server run dev",
+    "dev:web": "npm -w web run dev",
+    "dev:admin": "npm -w admin run dev",
+    "build": "npm -w server run build && npm -w web run build && npm -w admin run build"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  }
+}
