@@ -11,6 +11,7 @@ import {
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
 import Avatar, { AVATAR_FRAMES, AVATAR_PRESETS } from '../components/Avatar';
+import Icon from '../components/Icon';
 
 interface SubView {
   id: number;
@@ -98,7 +99,7 @@ function CredentialRow({ label, value }: { label: string; value?: string }) {
           setTimeout(() => setCopied(false), 1500);
         }}
       >
-        {copied ? '✓' : '⧉'}
+        <Icon name={copied ? 'check' : 'copy'} size={14} />
       </button>
     </div>
   );
@@ -347,8 +348,8 @@ export default function Account() {
                     {s.planName} · {t('pay.orderNo')} {s.orderNo}
                   </span>
                   <div className="sub-meta">
-                    <span>📦 {s.deliveryMethod ?? '账号凭据'}</span>
-                    <span>🛡️ {s.warranty ?? '有效期内免费补发'}</span>
+                    <span><Icon name="box" size={12} /> {s.deliveryMethod ?? '账号凭据'}</span>
+                    <span><Icon name="shield" size={12} /> {s.warranty ?? '有效期内免费补发'}</span>
                   </div>
                 </div>
                 <span className={`badge badge-${s.status}`}>
@@ -676,7 +677,7 @@ export default function Account() {
               <Avatar value={avatar} frame={avatarFrame} size={96} />
               <div className="ae-side">
                 <label className="btn btn-ghost btn-sm upload-btn">
-                  📤 {t('profile.upload')}
+                  <Icon name="upload" size={14} /> {t('profile.upload')}
                   <input type="file" accept="image/*" onChange={onUpload} hidden />
                 </label>
                 <span className="muted small">{t('profile.uploadHint')}</span>
@@ -767,7 +768,7 @@ export default function Account() {
           </div>
 
           <div className="panel">
-            <h3>🔐 {t('profile.security')} · {t('profile.loginHistory')}</h3>
+            <h3><Icon name="lock" size={15} /> {t('profile.security')} · {t('profile.loginHistory')}</h3>
             <div className="table-wrap">
               <table>
                 <thead>

@@ -1,5 +1,6 @@
 import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
+import { json, urlencoded } from 'express';
 import { ValidationPipe } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import * as fs from 'fs';
@@ -42,6 +43,9 @@ async function bootstrap() {
   await preflight();
   const app = await NestFactory.create(AppModule);
   app.setGlobalPrefix('api');
+  // 头像 base64 上传：Express 默认 100KB body 上限会导致 413，这里放宽到 4MB
+  app.use(json({ limit: '4mb' }));
+  app.use(urlencoded({ extended: true, limit: '4mb' }));
   app.enableCors({ origin: true, credentials: true });
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, transform: true }));
 

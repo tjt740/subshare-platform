@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import { api, fmtTime } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
+import { OnlinePulse } from './CanvasFx';
+import Icon from './Icon';
+import Avatar from './Avatar';
 
 interface TicketRow {
   id: number;
@@ -14,11 +17,11 @@ interface TicketRow {
 
 /* ---------- 值班客服（人格化：轮班制，增强真人在线感） ---------- */
 const AGENTS = [
-  { name: '小柚', emoji: '🍊', title: '交付专员' },
-  { name: 'Lily', emoji: '👩‍💼', title: '售后主管' },
-  { name: '阿哲', emoji: '🧑‍💻', title: '技术支持' },
-  { name: '小北', emoji: '🐻', title: '客服专员' },
-  { name: 'Momo', emoji: '🐱', title: '资深客服' },
+  { name: '小柚', emoji: 'sv:spark', title: '交付专员' },
+  { name: 'Lily', emoji: 'sv:flower', title: '售后主管' },
+  { name: '阿哲', emoji: 'sv:robot', title: '技术支持' },
+  { name: '小北', emoji: 'sv:cat', title: '客服专员' },
+  { name: 'Momo', emoji: 'sv:moon', title: '资深客服' },
 ];
 
 /** 按 6 小时轮班 + 按天轮换，让"值班客服"随时间自然变化 */
@@ -178,9 +181,14 @@ export default function SupportWidget() {
 
   if (!open) {
     return (
-      <button className="cs-fab" onClick={() => setOpen(true)} title={`${duty.name} · ${t('cs.online')}`}>
-        💬
-        <span className="fab-dot" />
+      <button
+        className="cs-fab"
+        onClick={() => setOpen(true)}
+        aria-label={`${duty.name} · ${t('cs.online')}`}
+        title={`${duty.name} · ${t('cs.online')}`}
+      >
+        <Icon name="chat" size={22} />
+        <span className="fab-pulse"><OnlinePulse size={16} /></span>
       </button>
     );
   }
@@ -189,8 +197,8 @@ export default function SupportWidget() {
 
   return (
     <>
-      <button className="cs-fab" onClick={() => setOpen(false)} title="收起">
-        ✕
+      <button className="cs-fab" onClick={() => setOpen(false)} aria-label="收起客服窗口">
+        <Icon name="close" size={20} />
       </button>
       <div className="cs-panel">
         <div className="cs-head">
@@ -208,13 +216,13 @@ export default function SupportWidget() {
           ) : (
             <div className="cs-agent">
               <span className="cs-avatar">
-                {duty.emoji}
-                <i className="online-dot" />
+                <Avatar value={duty.emoji} size={38} />
+                <i className="cs-online"><OnlinePulse size={14} /></i>
               </span>
               <div>
                 <b>{t('cs.duty', { name: duty.name, title: duty.title })}</b>
                 <p>
-                  <i className="online-dot inline" /> {t('cs.online')} · {t('cs.shiftDuty', { shift })} · {t('cs.avg')}
+                  <span className="live-dot" /> {t('cs.online')} · {t('cs.shiftDuty', { shift })} · {t('cs.avg')}
                 </p>
               </div>
             </div>
@@ -222,8 +230,8 @@ export default function SupportWidget() {
           {view === 'new' && (
             <div className="cs-agent" style={{ marginTop: 6 }}>
               <span className="cs-avatar">
-                {duty.emoji}
-                <i className="online-dot" />
+                <Avatar value={duty.emoji} size={38} />
+                <i className="cs-online"><OnlinePulse size={14} /></i>
               </span>
               <div>
                 <b>{t('cs.serving', { name: duty.name })}</b>
@@ -234,8 +242,8 @@ export default function SupportWidget() {
           {view === 'thread' && current && (
             <div className="cs-agent" style={{ marginTop: 6 }}>
               <span className="cs-avatar">
-                {threadAgent.emoji}
-                <i className="online-dot" />
+                <Avatar value={threadAgent.emoji} size={38} />
+                <i className="cs-online"><OnlinePulse size={14} /></i>
               </span>
               <div>
                 <b>{current.subject}</b>
@@ -305,7 +313,7 @@ export default function SupportWidget() {
                 {t('cs.greeting', { shift, name: duty.name, title: duty.title })}
               </div>
               <div className="m-time">
-                {duty.emoji} {duty.name} · {t('cs.official')} · {t('cs.justNow')}
+                {duty.name} · {t('cs.official')} · {t('cs.justNow')}
               </div>
             </div>
             <label className="field">
@@ -386,7 +394,7 @@ export default function SupportWidget() {
                   <div className="bubble">{m.content}</div>
                   <div className="m-time">
                     {m.senderRole === 'admin'
-                      ? `${threadAgent.emoji} ${threadAgent.name} · ${t('cs.official')} · `
+                      ? `${threadAgent.name} · ${t('cs.official')} · `
                       : ''}
                     {fmtTime(m.createdAt)}
                   </div>

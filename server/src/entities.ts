@@ -92,6 +92,12 @@ export class PriceBook {
   @Column({ type: 'text' }) region: string;
   @Column({ type: 'text' }) currency: string;
   @Column({ type: 'real' }) price: number;
+  /** 定价拆解：售价 = 成本 + 手续费 + 售后准备金 + 运营费用 + 目标利润 */
+  @Column({ type: 'real', default: 0 }) costAmount: number;
+  @Column({ type: 'real', default: 0 }) paymentFeeAmount: number;
+  @Column({ type: 'real', default: 0 }) aftersalesReserveAmount: number;
+  @Column({ type: 'real', default: 0 }) operationCostAmount: number;
+  @Column({ type: 'real', default: 0 }) targetProfitAmount: number;
 }
 
 @Entity('inventory_accounts')
@@ -104,6 +110,58 @@ export class InventoryAccount {
   @Column({ type: 'integer', default: 5 }) maxSlots: number;
   @Column({ type: 'text', default: 'ok' }) health: 'ok' | 'banned';
   @Column({ type: 'integer', nullable: true }) supplierId: number | null; // 供应商来源
+  @Index({ unique: true })
+  @Column({ type: 'text', nullable: true })
+  accountCode: string | null;
+  @Column({ type: 'text', default: 'active' })
+  lifecycleStatus: 'active' | 'renew_due' | 'expired' | 'suspended' | 'retired';
+  @Column({ type: 'datetime', nullable: true }) purchasedAt: Date | null;
+  @Column({ type: 'datetime', nullable: true }) serviceStartedAt: Date | null;
+  @Column({ type: 'datetime', nullable: true }) lastRechargedAt: Date | null;
+  @Column({ type: 'datetime', nullable: true }) nextRechargeAt: Date | null;
+  @Column({ type: 'datetime', nullable: true }) expiresAt: Date | null;
+  @Column({ type: 'integer', default: 0 }) serviceDays: number;
+  @Column({ type: 'real', default: 0 }) costAmount: number;
+  @Column({ type: 'text', default: 'USD' }) costCurrency: string;
+  @Column({ type: 'real', default: 0 }) costUsd: number;
+  @Column({ type: 'text', default: '' }) purchaseOrderNo: string;
+  @Column({ type: 'text', default: '' }) invoiceNo: string;
+  @Column({ type: 'integer', nullable: true }) createdBy: number | null;
+  @Column({ type: 'integer', nullable: true }) updatedBy: number | null;
+  @Column({ type: 'datetime', nullable: true }) lastCheckedAt: Date | null;
+  @Column({ type: 'boolean', default: false }) autoRenew: boolean;
+  @Column({ type: 'text', default: '' }) notes: string;
+  @CreateDateColumn() createdAt: Date;
+  @UpdateDateColumn() updatedAt: Date;
+}
+
+/** 账号采购/充值/调账流水：每次成本变化都保留原始记录 */
+@Entity('account_cost_entries')
+export class AccountCostEntry {
+  @PrimaryGeneratedColumn() id: number;
+  @Index()
+  @Column({ type: 'integer' }) accountId: number;
+  @Column({ type: 'text', default: 'purchase' })
+  type: 'purchase' | 'recharge' | 'adjustment' | 'supplier_refund';
+  @Column({ type: 'real' }) amount: number;
+  @Column({ type: 'text' }) currency: string;
+  @Column({ type: 'real' }) amountUsd: number;
+  @Column({ type: 'datetime', nullable: true }) effectiveFrom: Date | null;
+  @Column({ type: 'datetime', nullable: true }) effectiveTo: Date | null;
+  @Column({ type: 'integer', nullable: true }) operatorId: number | null;
+  @Column({ type: 'text', default: '' }) note: string;
+  @CreateDateColumn() createdAt: Date;
+}
+
+/** 账号操作审计：保存修改前后字段，支持责任追溯 */
+@Entity('inventory_audit_logs')
+export class InventoryAuditLog {
+  @PrimaryGeneratedColumn() id: number;
+  @Index()
+  @Column({ type: 'integer' }) accountId: number;
+  @Column({ type: 'integer', nullable: true }) operatorId: number | null;
+  @Column({ type: 'text' }) action: string;
+  @Column({ type: 'text', default: '{}' }) changes: string;
   @CreateDateColumn() createdAt: Date;
 }
 
@@ -115,6 +173,31 @@ export class Slot {
   accountId: number;
   @Column({ type: 'integer', nullable: true }) orderId: number | null;
   @Column({ type: 'text', default: 'free' }) status: 'free' | 'assigned' | 'revoked';
+}
+
+/** 坑位分配历史：把每笔订单收入准确归属到具体账号/坑位/服务周期 */
+@Entity('slot_assignments')
+export class SlotAssignment {
+  @PrimaryGeneratedColumn() id: number;
+  @Index()
+  @Column({ type: 'integer' }) accountId: number;
+  @Index()
+  @Column({ type: 'integer' }) slotId: number;
+  @Index()
+  @Column({ type: 'integer' }) orderId: number;
+  @Column({ type: 'integer' }) orderItemId: number;
+  @Column({ type: 'integer' }) subscriptionId: number;
+  @Column({ type: 'datetime' }) startsAt: Date;
+  @Column({ type: 'datetime' }) endsAt: Date;
+  @Column({ type: 'real' }) saleAmount: number;
+  @Column({ type: 'text' }) saleCurrency: string;
+  @Column({ type: 'real' }) saleUsd: number;
+  @Column({ type: 'real', default: 0 }) paymentFeeUsd: number;
+  @Column({ type: 'real', default: 0 }) refundUsd: number;
+  @Column({ type: 'text', default: 'active' })
+  status: 'active' | 'ended' | 'refunded' | 'revoked';
+  @CreateDateColumn() createdAt: Date;
+  @UpdateDateColumn() updatedAt: Date;
 }
 
 @Entity('orders')
@@ -134,7 +217,18 @@ export class Order {
   @Column({ type: 'text', default: 'created' })
   status: 'created' | 'paid' | 'allocating' | 'delivered' | 'refunded' | 'canceled';
   @Column({ type: 'datetime', nullable: true }) paidAt: Date | null;
+  @Column({ type: 'text', default: 'unpaid' })
+  paymentStatus: 'unpaid' | 'paid' | 'partially_refunded' | 'refunded' | 'failed';
+  @Column({ type: 'text', default: 'pending' })
+  fulfillmentStatus: 'pending' | 'processing' | 'partial' | 'delivered' | 'failed';
+  @Column({ type: 'text', default: 'none' })
+  refundStatus: 'none' | 'requested' | 'approved' | 'refunded' | 'failed';
+  @Column({ type: 'text', default: 'unsettled' })
+  settlementStatus: 'unsettled' | 'settled' | 'exception';
+  @Column({ type: 'datetime', nullable: true }) deliveredAt: Date | null;
+  @Column({ type: 'datetime', nullable: true }) refundedAt: Date | null;
   @CreateDateColumn() createdAt: Date;
+  @UpdateDateColumn() updatedAt: Date;
 }
 
 /** 订单明细（购物车合并结算：一单多商品） */
@@ -267,13 +361,31 @@ export class SiteSetting {
   @Column({ type: 'text', default: '{}' }) value: string; // JSON
 }
 
+/** 站点修改单：编辑只生成待审核版本，审核通过才覆盖正式配置 */
+@Entity('site_config_revisions')
+export class SiteConfigRevision {
+  @PrimaryGeneratedColumn() id: number;
+  @Column({ type: 'text', default: '{}' }) config: string;
+  @Column({ type: 'text', default: 'pending' })
+  status: 'pending' | 'approved' | 'rejected';
+  @Index()
+  @Column({ type: 'integer' }) submittedBy: number;
+  @Column({ type: 'integer', nullable: true }) reviewedBy: number | null;
+  @Column({ type: 'datetime', nullable: true }) reviewedAt: Date | null;
+  @Column({ type: 'text', default: '' }) reviewNote: string;
+  @CreateDateColumn() createdAt: Date;
+}
+
 export const ALL_ENTITIES = [
   User,
   Product,
   Plan,
   PriceBook,
   InventoryAccount,
+  AccountCostEntry,
+  InventoryAuditLog,
   Slot,
+  SlotAssignment,
   Order,
   OrderItem,
   Payment,
@@ -283,6 +395,7 @@ export const ALL_ENTITIES = [
   TicketMessage,
   SupplierSubmission,
   SiteSetting,
+  SiteConfigRevision,
   LoginLog,
 ];
 

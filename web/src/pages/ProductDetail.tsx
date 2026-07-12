@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, CATEGORY_ICON, money, starStr, toUsd } from '../api';
+import { api, money, starStr, toUsd } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
 import { Reveal, SaleCountdown } from '../components/fx';
+import Icon, { CATEGORY_ICON_NAME } from '../components/Icon';
 
 interface PlanView {
   id: number;
@@ -121,14 +122,14 @@ export default function ProductDetail() {
       <div className="detail">
         <div className="detail-info">
           <div className="detail-hero">
-            <div className="big-logo">{CATEGORY_ICON[detail.category] ?? '📦'}</div>
+            <div className="big-logo"><Icon name={CATEGORY_ICON_NAME[detail.category] ?? 'box'} size={42} /></div>
             <div>
               <h1>{detail.title}</h1>
               <div className="sub">
                 <span className="stars">{starStr(detail.rating)} {detail.rating.toFixed(1)}</span>
                 <span>{detail.soldCount.toLocaleString()} {t('card.sold')}</span>
                 {meta.badge && <span>{meta.badge}</span>}
-                <span>⚡ 自动发货</span>
+                <span><Icon name="bolt" size={13} /> 自动发货</span>
               </div>
             </div>
           </div>
@@ -155,10 +156,10 @@ export default function ProductDetail() {
           <h2 className="section-title">{t('detail.delivery')}</h2>
           <div className="delivery-banner">
             <span className="chip">
-              📦 {meta.delivery?.method ?? '账号凭据'}
+              <Icon name="box" size={13} /> {meta.delivery?.method ?? '账号凭据'}
             </span>
             <span className="chip chip-ok">
-              ⚡ {meta.delivery?.time ?? '支付后自动交付'}
+              <Icon name="bolt" size={13} /> {meta.delivery?.time ?? '支付后自动交付'}
             </span>
           </div>
           <div className="flow-steps">
@@ -174,7 +175,7 @@ export default function ProductDetail() {
             <Reveal>
               <h2 className="section-title">{t('detail.aftersales')}</h2>
               {meta.warranty && (
-                <div className="warranty-banner">✅ {meta.warranty}</div>
+                <div className="warranty-banner"><Icon name="shield" size={16} /> {meta.warranty}</div>
               )}
               <div className="as-list">
                 {(meta.aftersales ?? []).map((a, i) => (
@@ -297,7 +298,7 @@ export default function ProductDetail() {
             {added ? t('detail.added') : inCart ? t('detail.inCart') : t('detail.addCart')}
           </button>
           <details className="price-note">
-            <summary>ℹ️ {t('price.title')}</summary>
+            <summary><Icon name="info" size={13} /> {t('price.title')}</summary>
             <ul>
               <li>{t('price.fx')}</li>
               <li>{t('price.renew')}</li>
@@ -330,7 +331,7 @@ export default function ProductDetail() {
           onClick={handleAddToCart}
           title="加入购物车"
         >
-          {inCart || added ? '✓' : '🛒'}
+          <Icon name={inCart || added ? 'check' : 'cart'} size={18} />
         </button>
         <button
           className="btn btn-primary btn-lg"

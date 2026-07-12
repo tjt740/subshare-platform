@@ -4,13 +4,15 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Between, In, Like, MoreThanOrEqual, LessThanOrEqual, Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import {
   ADMIN_PERMISSIONS,
+  AccountCostEntry,
   computeLevel,
   effectiveLevel,
   InventoryAccount,
+  InventoryAuditLog,
   Order,
   OrderItem,
   Payment,
@@ -18,7 +20,9 @@ import {
   PriceBook,
   Product,
   SiteSetting,
+  SiteConfigRevision,
   Slot,
+  SlotAssignment,
   Subscription,
   SupplierSubmission,
   Ticket,
@@ -30,6 +34,16 @@ import {
 import { FulfillmentService } from '../payments/fulfillment.service';
 import { OrdersService } from '../orders/orders.service';
 
+const money = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
+const DAY_MS = 86_400_000;
+const ratioAt = (start: Date | null, end: Date | null, asOf: Date) => {
+  if (!start || !end) return 1;
+  const from = new Date(start).getTime();
+  const to = new Date(end).getTime();
+  if (to <= from) return 1;
+  return Math.max(0, Math.min(1, (asOf.getTime() - from) / (to - from)));
+};
+
 @Injectable()
 export class AdminService {
   constructor(
@@ -39,7 +53,13 @@ export class AdminService {
     @InjectRepository(PriceBook) private readonly prices: Repository<PriceBook>,
     @InjectRepository(InventoryAccount)
     private readonly accounts: Repository<InventoryAccount>,
+    @InjectRepository(AccountCostEntry)
+    private readonly accountCosts: Repository<AccountCostEntry>,
+    @InjectRepository(InventoryAuditLog)
+    private readonly inventoryAudits: Repository<InventoryAuditLog>,
     @InjectRepository(Slot) private readonly slots: Repository<Slot>,
+    @InjectRepository(SlotAssignment)
+    private readonly assignments: Repository<SlotAssignment>,
     @InjectRepository(Order) private readonly orders: Repository<Order>,
     @InjectRepository(OrderItem)
     private readonly orderItems: Repository<OrderItem>,
@@ -55,14 +75,21 @@ export class AdminService {
     private readonly txns: Repository<WalletTransaction>,
     @InjectRepository(SiteSetting)
     private readonly settings: Repository<SiteSetting>,
+    @InjectRepository(SiteConfigRevision)
+    private readonly siteRevisions: Repository<SiteConfigRevision>,
     private readonly fulfillment: FulfillmentService,
     private readonly ordersService: OrdersService,
   ) {}
 
   // ---------- 看板 ----------
   async metrics() {
-    const paidStatuses: Order['status'][] = ['paid', 'delivered'];
-    const paidOrders = await this.orders.findBy({ status: In(paidStatuses) });
+    // paymentStatus 是新账务口径；兼容升级前仅有 status 的历史订单。
+    const paidOrders = await this.orders.find({
+      where: [
+        { paymentStatus: 'paid' },
+        { status: In(['paid', 'delivered', 'allocating']) },
+      ],
+    });
     const revenueByCurrency: Record<string, number> = {};
     let revenueUsd = 0;
     for (const o of paidOrders) {
@@ -71,6 +98,76 @@ export class AdminService {
         100;
       revenueUsd += toUsd(o.amount, o.currency);
     }
+    const now = new Date();
+    const assignments = await this.assignments.find();
+    const accounts = await this.accounts.find();
+    const costs = await this.accountCosts.find();
+    const totalCostUsd = money(
+      costs.length
+        ? costs.reduce((sum, x) => sum + x.amountUsd, 0)
+        : accounts.reduce((sum, x) => sum + (x.costUsd || 0), 0),
+    );
+    const cashRevenueUsd = money(
+      assignments.reduce((sum, x) => sum + x.saleUsd - x.refundUsd, 0),
+    );
+    const recognizedRevenueUsd = money(
+      assignments.reduce(
+        (sum, x) =>
+          sum +
+          Math.max(0, x.saleUsd - x.refundUsd) *
+            ratioAt(x.startsAt, x.endsAt, now),
+        0,
+      ),
+    );
+    const recognizedCostUsd = money(
+      costs.length
+        ? costs.reduce(
+            (sum, x) =>
+              sum + x.amountUsd * ratioAt(x.effectiveFrom, x.effectiveTo, now),
+            0,
+          )
+        : accounts.reduce(
+            (sum, x) =>
+              sum + x.costUsd * ratioAt(x.serviceStartedAt, x.expiresAt, now),
+            0,
+          ),
+    );
+    const paymentFeesUsd = money(
+      assignments.reduce((sum, x) => sum + x.paymentFeeUsd, 0),
+    );
+    const grossProfitUsd = money(
+      recognizedRevenueUsd - recognizedCostUsd - paymentFeesUsd,
+    );
+
+    const trend = Array.from({ length: 30 }, (_, index) => {
+      const asOf = new Date(now);
+      asOf.setHours(23, 59, 59, 999);
+      asOf.setDate(asOf.getDate() - (29 - index));
+      const recognizedRevenue = assignments.reduce(
+        (sum, x) =>
+          sum +
+          Math.max(0, x.saleUsd - x.refundUsd) *
+            ratioAt(x.startsAt, x.endsAt, asOf),
+        0,
+      );
+      const recognizedCost = costs.length
+        ? costs.reduce(
+            (sum, x) =>
+              sum + x.amountUsd * ratioAt(x.effectiveFrom, x.effectiveTo, asOf),
+            0,
+          )
+        : accounts.reduce(
+            (sum, x) =>
+              sum + x.costUsd * ratioAt(x.serviceStartedAt, x.expiresAt, asOf),
+            0,
+          );
+      return {
+        date: asOf.toISOString().slice(0, 10),
+        revenue: money(recognizedRevenue),
+        cost: money(recognizedCost),
+        profit: money(recognizedRevenue - recognizedCost),
+      };
+    });
     const recent = await this.orders.find({ order: { id: 'DESC' }, take: 8 });
     return {
       users: await this.users.countBy({ role: 'user' }),
@@ -88,6 +185,20 @@ export class AdminService {
       },
       revenueByCurrency,
       revenueUsd: Math.round(revenueUsd * 100) / 100,
+      finance: {
+        cashRevenueUsd,
+        recognizedRevenueUsd,
+        deferredRevenueUsd: money(cashRevenueUsd - recognizedRevenueUsd),
+        totalCostUsd,
+        recognizedCostUsd,
+        paymentFeesUsd,
+        grossProfitUsd,
+        grossMargin:
+          recognizedRevenueUsd > 0
+            ? money((grossProfitUsd / recognizedRevenueUsd) * 100)
+            : 0,
+      },
+      trend,
       recentOrders: await this.ordersService.decorate(recent),
     };
   }
@@ -207,19 +318,38 @@ export class AdminService {
 
   async setPrices(
     planId: number,
-    items: { region: string; currency: string; price: number }[],
+    items: {
+      region: string;
+      currency: string;
+      price: number;
+      costAmount?: number;
+      paymentFeeAmount?: number;
+      aftersalesReserveAmount?: number;
+      operationCostAmount?: number;
+      targetProfitAmount?: number;
+    }[],
   ) {
     const plan = await this.plans.findOneBy({ id: planId });
     if (!plan) throw new NotFoundException('套餐不存在');
     await this.prices.delete({ planId });
     for (const item of items) {
-      if (item.price == null || item.price < 0) continue;
+      const breakdown = {
+        costAmount: money(item.costAmount ?? 0),
+        paymentFeeAmount: money(item.paymentFeeAmount ?? 0),
+        aftersalesReserveAmount: money(item.aftersalesReserveAmount ?? 0),
+        operationCostAmount: money(item.operationCostAmount ?? 0),
+        targetProfitAmount: money(item.targetProfitAmount ?? 0),
+      };
+      const calculatedPrice = money(Object.values(breakdown).reduce((a, b) => a + b, 0));
+      const price = calculatedPrice > 0 ? calculatedPrice : money(item.price);
+      if (price < 0) continue;
       await this.prices.save(
         this.prices.create({
           planId,
           region: item.region,
           currency: item.currency,
-          price: item.price,
+          price,
+          ...breakdown,
         }),
       );
     }
@@ -227,27 +357,106 @@ export class AdminService {
   }
 
   // ---------- 库存 ----------
+  private accountFinance(
+    account: InventoryAccount,
+    entries: AccountCostEntry[],
+    assignments: SlotAssignment[],
+    asOf = new Date(),
+  ) {
+    const totalCostUsd = money(
+      entries.length
+        ? entries.reduce((sum, x) => sum + x.amountUsd, 0)
+        : account.costUsd || 0,
+    );
+    const recognizedCostUsd = money(
+      entries.length
+        ? entries.reduce(
+            (sum, x) =>
+              sum + x.amountUsd * ratioAt(x.effectiveFrom, x.effectiveTo, asOf),
+            0,
+          )
+        : (account.costUsd || 0) *
+            ratioAt(account.serviceStartedAt, account.expiresAt, asOf),
+    );
+    const cashRevenueUsd = money(
+      assignments.reduce((sum, x) => sum + x.saleUsd - x.refundUsd, 0),
+    );
+    const recognizedRevenueUsd = money(
+      assignments.reduce(
+        (sum, x) =>
+          sum +
+          Math.max(0, x.saleUsd - x.refundUsd) *
+            ratioAt(x.startsAt, x.endsAt, asOf),
+        0,
+      ),
+    );
+    const paymentFeesUsd = money(
+      assignments.reduce((sum, x) => sum + x.paymentFeeUsd, 0),
+    );
+    const grossProfitUsd = money(
+      recognizedRevenueUsd - recognizedCostUsd - paymentFeesUsd,
+    );
+    const remainingDays = account.expiresAt
+      ? Math.ceil((new Date(account.expiresAt).getTime() - asOf.getTime()) / DAY_MS)
+      : null;
+    return {
+      totalCostUsd,
+      cashRevenueUsd,
+      recognizedRevenueUsd,
+      deferredRevenueUsd: money(cashRevenueUsd - recognizedRevenueUsd),
+      recognizedCostUsd,
+      paymentFeesUsd,
+      grossProfitUsd,
+      projectedProfitUsd: money(cashRevenueUsd - totalCostUsd - paymentFeesUsd),
+      grossMargin:
+        recognizedRevenueUsd > 0
+          ? money((grossProfitUsd / recognizedRevenueUsd) * 100)
+          : 0,
+      remainingDays,
+    };
+  }
+
   async listInventory(planId?: number) {
     const where = planId ? { planId } : {};
     const accounts = await this.accounts.find({ where, order: { id: 'DESC' } });
-    const suppliers = await this.users.findBy({ role: 'supplier' });
-    const supplierMap = new Map(suppliers.map((s) => [s.id, s.email]));
-    const result = [];
-    for (const a of accounts) {
-      result.push({
-        ...a,
-        supplierEmail: a.supplierId ? supplierMap.get(a.supplierId) ?? '-' : null,
-        usedSlots: await this.slots.countBy({
-          accountId: a.id,
-          status: 'assigned',
-        }),
-        freeSlots: await this.slots.countBy({
-          accountId: a.id,
-          status: 'free',
-        }),
+    if (!accounts.length) return [];
+    const accountIds = accounts.map((x) => x.id);
+    const [operators, slotRows, costs, assignments] = await Promise.all([
+      this.users.find(),
+      this.slots.findBy({ accountId: In(accountIds) }),
+      this.accountCosts.findBy({ accountId: In(accountIds) }),
+      this.assignments.findBy({ accountId: In(accountIds) }),
+    ]);
+    const userMap = new Map(operators.map((s) => [s.id, s.email]));
+    return accounts.map((a) => {
+      const mineSlots = slotRows.filter((x) => x.accountId === a.id);
+      const mineCosts = costs.filter((x) => x.accountId === a.id);
+      const mineAssignments = assignments.filter((x) => x.accountId === a.id);
+      const finance = this.accountFinance(a, mineCosts, mineAssignments);
+      const series = Array.from({ length: 14 }, (_, index) => {
+        const asOf = new Date();
+        asOf.setHours(23, 59, 59, 999);
+        asOf.setDate(asOf.getDate() - (13 - index));
+        const point = this.accountFinance(a, mineCosts, mineAssignments, asOf);
+        return {
+          date: asOf.toISOString().slice(0, 10),
+          revenue: point.recognizedRevenueUsd,
+          cost: point.recognizedCostUsd,
+          profit: point.grossProfitUsd,
+        };
       });
-    }
-    return result;
+      return {
+        ...a,
+        supplierEmail: a.supplierId ? userMap.get(a.supplierId) ?? '-' : null,
+        createdByEmail: a.createdBy ? userMap.get(a.createdBy) ?? '-' : '-',
+        updatedByEmail: a.updatedBy ? userMap.get(a.updatedBy) ?? '-' : '-',
+        usedSlots: mineSlots.filter((x) => x.status === 'assigned').length,
+        freeSlots: mineSlots.filter((x) => x.status === 'free').length,
+        costEntries: mineCosts,
+        finance,
+        financeSeries: series,
+      };
+    });
   }
 
   async createInventory(data: {
@@ -255,16 +464,81 @@ export class AdminService {
     credentials: string;
     maxSlots: number;
     supplierId?: number | null;
-  }) {
+    accountCode?: string;
+    purchasedAt?: string;
+    serviceStartedAt?: string;
+    lastRechargedAt?: string;
+    nextRechargeAt?: string;
+    expiresAt?: string;
+    costAmount?: number;
+    costCurrency?: string;
+    purchaseOrderNo?: string;
+    invoiceNo?: string;
+    autoRenew?: boolean;
+    notes?: string;
+  }, operatorId: number) {
     const plan = await this.plans.findOneBy({ id: data.planId });
     if (!plan) throw new BadRequestException('套餐不存在');
     const maxSlots = Math.max(1, Math.min(50, data.maxSlots || 5));
+    const costAmount = money(data.costAmount ?? 0);
+    const costCurrency = data.costCurrency || 'USD';
+    const costUsd = toUsd(costAmount, costCurrency);
+    const serviceStartedAt = data.serviceStartedAt
+      ? new Date(data.serviceStartedAt)
+      : data.purchasedAt
+        ? new Date(data.purchasedAt)
+        : new Date();
+    const expiresAt = data.expiresAt ? new Date(data.expiresAt) : null;
     const account = await this.accounts.save(
       this.accounts.create({
         planId: data.planId,
         credentials: data.credentials,
         maxSlots,
         supplierId: data.supplierId ?? null,
+        accountCode:
+          data.accountCode ||
+          `ACC-${Date.now()}-${Math.floor(Math.random() * 900 + 100)}`,
+        lifecycleStatus: 'active',
+        purchasedAt: data.purchasedAt ? new Date(data.purchasedAt) : new Date(),
+        serviceStartedAt,
+        lastRechargedAt: data.lastRechargedAt ? new Date(data.lastRechargedAt) : null,
+        nextRechargeAt: data.nextRechargeAt ? new Date(data.nextRechargeAt) : null,
+        expiresAt,
+        serviceDays: expiresAt
+          ? Math.max(1, Math.ceil((expiresAt.getTime() - serviceStartedAt.getTime()) / DAY_MS))
+          : 0,
+        costAmount,
+        costCurrency,
+        costUsd,
+        purchaseOrderNo: data.purchaseOrderNo || '',
+        invoiceNo: data.invoiceNo || '',
+        createdBy: operatorId,
+        updatedBy: operatorId,
+        autoRenew: !!data.autoRenew,
+        notes: data.notes || '',
+      }),
+    );
+    if (costAmount > 0) {
+      await this.accountCosts.save(
+        this.accountCosts.create({
+          accountId: account.id,
+          type: 'purchase',
+          amount: costAmount,
+          currency: costCurrency,
+          amountUsd: costUsd,
+          effectiveFrom: serviceStartedAt,
+          effectiveTo: expiresAt,
+          operatorId,
+          note: '账号首次采购成本',
+        }),
+      );
+    }
+    await this.inventoryAudits.save(
+      this.inventoryAudits.create({
+        accountId: account.id,
+        operatorId,
+        action: 'create',
+        changes: JSON.stringify({ fields: Object.keys(data) }),
       }),
     );
     for (let i = 0; i < maxSlots; i++) {
@@ -282,30 +556,175 @@ export class AdminService {
     return account;
   }
 
-  async setInventoryHealth(id: number, health: 'ok' | 'banned') {
+  async updateInventory(id: number, data: Partial<InventoryAccount>, operatorId: number) {
+    const account = await this.accounts.findOneBy({ id });
+    if (!account) throw new NotFoundException('账号不存在');
+    const allowed = [
+      'planId', 'credentials', 'supplierId', 'accountCode', 'lifecycleStatus',
+      'purchasedAt', 'serviceStartedAt', 'lastRechargedAt', 'nextRechargeAt',
+      'expiresAt', 'purchaseOrderNo', 'invoiceNo', 'autoRenew', 'notes',
+      'lastCheckedAt',
+    ];
+    const changes: Record<string, unknown> = {};
+    for (const key of allowed) {
+      if ((data as any)[key] === undefined) continue;
+      const oldValue = (account as any)[key];
+      let value = (data as any)[key];
+      if (key.endsWith('At') && value) value = new Date(value);
+      (account as any)[key] = value;
+      changes[key] = { from: oldValue, to: value };
+    }
+    account.updatedBy = operatorId;
+    if (account.serviceStartedAt && account.expiresAt) {
+      account.serviceDays = Math.max(
+        1,
+        Math.ceil(
+          (new Date(account.expiresAt).getTime() -
+            new Date(account.serviceStartedAt).getTime()) /
+            DAY_MS,
+        ),
+      );
+    }
+    await this.accounts.save(account);
+    await this.inventoryAudits.save(
+      this.inventoryAudits.create({
+        accountId: id,
+        operatorId,
+        action: 'update',
+        changes: JSON.stringify(changes),
+      }),
+    );
+    return account;
+  }
+
+  async addAccountCost(
+    id: number,
+    data: {
+      type?: AccountCostEntry['type'];
+      amount: number;
+      currency: string;
+      effectiveFrom?: string;
+      effectiveTo?: string;
+      note?: string;
+    },
+    operatorId: number,
+  ) {
+    const account = await this.accounts.findOneBy({ id });
+    if (!account) throw new NotFoundException('账号不存在');
+    const amount = money(data.amount);
+    if (!amount) throw new BadRequestException('成本金额不能为 0');
+    const currency = data.currency || 'USD';
+    const entry = await this.accountCosts.save(
+      this.accountCosts.create({
+        accountId: id,
+        type: data.type || 'recharge',
+        amount,
+        currency,
+        amountUsd: toUsd(amount, currency),
+        effectiveFrom: data.effectiveFrom ? new Date(data.effectiveFrom) : new Date(),
+        effectiveTo: data.effectiveTo ? new Date(data.effectiveTo) : account.expiresAt,
+        operatorId,
+        note: data.note || '',
+      }),
+    );
+    account.costAmount = money(account.costAmount + amount);
+    account.costUsd = money(account.costUsd + entry.amountUsd);
+    account.lastRechargedAt = new Date();
+    if (data.effectiveTo) account.expiresAt = new Date(data.effectiveTo);
+    account.updatedBy = operatorId;
+    await this.accounts.save(account);
+    await this.inventoryAudits.save(
+      this.inventoryAudits.create({
+        accountId: id,
+        operatorId,
+        action: 'add_cost',
+        changes: JSON.stringify({ costEntryId: entry.id, amount, currency }),
+      }),
+    );
+    return entry;
+  }
+
+  async setInventoryHealth(id: number, health: 'ok' | 'banned', operatorId?: number) {
     const account = await this.accounts.findOneBy({ id });
     if (!account) throw new NotFoundException('账号不存在');
     account.health = health;
-    return this.accounts.save(account);
+    account.updatedBy = operatorId ?? account.updatedBy;
+    await this.accounts.save(account);
+    await this.inventoryAudits.save(
+      this.inventoryAudits.create({
+        accountId: id,
+        operatorId: operatorId ?? null,
+        action: 'health',
+        changes: JSON.stringify({ health }),
+      }),
+    );
+    return account;
   }
 
   // ---------- 订单 ----------
-  async listOrders(status?: string) {
-    const where = status ? { status: status as Order['status'] } : {};
-    const orders = await this.orders.find({
+  async listOrders(filters: {
+    status?: string;
+    search?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    page?: number;
+    pageSize?: number;
+  }) {
+    const page = Math.max(1, Number(filters.page) || 1);
+    const pageSize = Math.max(10, Math.min(100, Number(filters.pageSize) || 20));
+    const base: any = {};
+    if (filters.status) base.status = filters.status as Order['status'];
+    if (filters.dateFrom && filters.dateTo) {
+      base.createdAt = Between(
+        new Date(`${filters.dateFrom}T00:00:00`),
+        new Date(`${filters.dateTo}T23:59:59.999`),
+      );
+    } else if (filters.dateFrom) {
+      base.createdAt = MoreThanOrEqual(new Date(`${filters.dateFrom}T00:00:00`));
+    } else if (filters.dateTo) {
+      base.createdAt = LessThanOrEqual(new Date(`${filters.dateTo}T23:59:59.999`));
+    }
+    let where: any = base;
+    if (filters.search?.trim()) {
+      const keyword = filters.search.trim();
+      const matchedUsers = await this.users.find({
+        where: { email: Like(`%${keyword}%`) },
+        take: 200,
+      });
+      const variants: any[] = [
+        { ...base, orderNo: Like(`%${keyword}%`) },
+      ];
+      if (matchedUsers.length) {
+        variants.push({ ...base, userId: In(matchedUsers.map((x) => x.id)) });
+      }
+      where = variants;
+    }
+    const [orders, total] = await this.orders.findAndCount({
       where,
       order: { id: 'DESC' },
-      take: 200,
+      skip: (page - 1) * pageSize,
+      take: pageSize,
     });
     const decorated = await this.ordersService.decorate(orders);
     const users = await this.users.findBy({
       id: In(orders.map((o) => o.userId)),
     });
     const userMap = new Map(users.map((u) => [u.id, u.email]));
-    return decorated.map((o) => ({
-      ...o,
-      userEmail: userMap.get(o.userId) ?? '-',
-    }));
+    const summaryRows = await this.orders.find();
+    const summary = summaryRows.reduce<Record<string, number>>((acc, row) => {
+      acc[row.status] = (acc[row.status] || 0) + 1;
+      return acc;
+    }, {});
+    return {
+      items: decorated.map((o) => ({
+        ...o,
+        userEmail: userMap.get(o.userId) ?? '-',
+      })),
+      total,
+      page,
+      pageSize,
+      summary,
+    };
   }
 
   /** 退款：回收坑位 + 吊销订阅 + 退款金额按汇率折 USD 入用户钱包 */
@@ -317,6 +736,10 @@ export class AdminService {
     }
     await this.fulfillment.revoke(order);
     order.status = 'refunded';
+    order.paymentStatus = 'refunded';
+    order.refundStatus = 'refunded';
+    order.fulfillmentStatus = 'failed';
+    order.refundedAt = new Date();
     await this.orders.save(order);
 
     const usd = toUsd(order.amount, order.currency);
@@ -413,6 +836,86 @@ export class AdminService {
     row.value = JSON.stringify(config ?? {});
     await this.settings.save(row);
     return this.getSiteConfig();
+  }
+
+  async getSiteConfigWorkspace() {
+    const published = await this.getSiteConfig();
+    const revisions = await this.siteRevisions.find({
+      order: { id: 'DESC' },
+      take: 30,
+    });
+    const userIds = [
+      ...new Set(
+        revisions.flatMap((x) =>
+          [x.submittedBy, x.reviewedBy].filter(Boolean) as number[],
+        ),
+      ),
+    ];
+    const users = userIds.length
+      ? await this.users.findBy({ id: In(userIds) })
+      : [];
+    const userMap = new Map(users.map((x) => [x.id, x.email]));
+    return {
+      published,
+      revisions: revisions.map((x) => ({
+        ...x,
+        config: (() => {
+          try {
+            return JSON.parse(x.config);
+          } catch {
+            return {};
+          }
+        })(),
+        submittedByEmail: userMap.get(x.submittedBy) ?? '-',
+        reviewedByEmail: x.reviewedBy
+          ? userMap.get(x.reviewedBy) ?? '-'
+          : null,
+      })),
+    };
+  }
+
+  async submitSiteConfig(config: Record<string, unknown>, submittedBy: number) {
+    if (!config || typeof config !== 'object' || Array.isArray(config)) {
+      throw new BadRequestException('站点配置格式不正确');
+    }
+    return this.siteRevisions.save(
+      this.siteRevisions.create({
+        config: JSON.stringify(config),
+        status: 'pending',
+        submittedBy,
+        reviewedBy: null,
+        reviewedAt: null,
+        reviewNote: '',
+      }),
+    );
+  }
+
+  async reviewSiteConfig(
+    id: number,
+    approve: boolean,
+    reviewNote: string,
+    reviewedBy: number,
+  ) {
+    const revision = await this.siteRevisions.findOneBy({ id });
+    if (!revision) throw new NotFoundException('站点修改单不存在');
+    if (revision.status !== 'pending') {
+      throw new BadRequestException('该修改单已经审核');
+    }
+    revision.status = approve ? 'approved' : 'rejected';
+    revision.reviewedBy = reviewedBy;
+    revision.reviewedAt = new Date();
+    revision.reviewNote = reviewNote || '';
+    await this.siteRevisions.save(revision);
+    if (approve) {
+      let config: Record<string, unknown> = {};
+      try {
+        config = JSON.parse(revision.config);
+      } catch {
+        throw new BadRequestException('修改单配置无法解析');
+      }
+      await this.setSiteConfig(config);
+    }
+    return this.getSiteConfigWorkspace();
   }
 
   /** 库存下钻：单账号全部坑位 + 占用订单/用户 */
@@ -566,7 +1069,12 @@ export class AdminService {
   }
 
   /** 审核：账号提交通过 -> 自动入库生成坑位并补发排队订单；产品提议通过 -> 创建下架状态草稿商品 */
-  async reviewSubmission(id: number, approve: boolean, reviewNote: string) {
+  async reviewSubmission(
+    id: number,
+    approve: boolean,
+    reviewNote: string,
+    operatorId: number,
+  ) {
     const sub = await this.submissions.findOneBy({ id });
     if (!sub) throw new NotFoundException('提交记录不存在');
     if (sub.status !== 'pending') {
@@ -583,7 +1091,7 @@ export class AdminService {
           }),
           maxSlots: sub.maxSlots,
           supplierId: sub.supplierId,
-        });
+        }, operatorId);
       } else {
         const slug = `supplier-${sub.id}-${Date.now().toString(36)}`;
         await this.products.save(

@@ -109,7 +109,16 @@ interface PlanRow {
   periodMonths: number;
   status: 'on' | 'off';
   stock: number;
-  prices: { region: string; currency: string; price: number }[];
+  prices: {
+    region: string;
+    currency: string;
+    price: number;
+    costAmount?: number;
+    paymentFeeAmount?: number;
+    aftersalesReserveAmount?: number;
+    operationCostAmount?: number;
+    targetProfitAmount?: number;
+  }[];
 }
 
 /** 商品 / 套餐 / 地区定价 三级管理 */
@@ -135,6 +144,7 @@ export default function Products() {
   const [priceModal, setPriceModal] = useState(false);
   const [pricingPlan, setPricingPlan] = useState<PlanRow | null>(null);
   const [priceForm] = Form.useForm();
+  const priceValues: any = Form.useWatch([], priceForm) || {};
 
   const loadProducts = useCallback(() => {
     setLoading(true);
@@ -234,6 +244,11 @@ export default function Products() {
       initial[`price_${region}`] = row?.price ?? null;
       initial[`currency_${region}`] =
         row?.currency ?? (region === 'EU' ? 'EUR' : region === 'CN' ? 'CNY' : 'USD');
+      initial[`costAmount_${region}`] = row?.costAmount ?? 0;
+      initial[`paymentFeeAmount_${region}`] = row?.paymentFeeAmount ?? 0;
+      initial[`aftersalesReserveAmount_${region}`] = row?.aftersalesReserveAmount ?? 0;
+      initial[`operationCostAmount_${region}`] = row?.operationCostAmount ?? 0;
+      initial[`targetProfitAmount_${region}`] = row?.targetProfitAmount ?? 0;
     }
     priceForm.setFieldsValue(initial);
     setPriceModal(true);
@@ -248,6 +263,11 @@ export default function Products() {
       region,
       currency: values[`currency_${region}`],
       price: values[`price_${region}`],
+      costAmount: values[`costAmount_${region}`] || 0,
+      paymentFeeAmount: values[`paymentFeeAmount_${region}`] || 0,
+      aftersalesReserveAmount: values[`aftersalesReserveAmount_${region}`] || 0,
+      operationCostAmount: values[`operationCostAmount_${region}`] || 0,
+      targetProfitAmount: values[`targetProfitAmount_${region}`] || 0,
     }));
     try {
       await api(`/admin/plans/${pricingPlan.id}/prices`, {
@@ -588,27 +608,62 @@ export default function Products() {
         onOk={savePricing}
         onCancel={() => setPriceModal(false)}
         destroyOnClose
+        width={920}
       >
-        <p style={{ color: '#888', fontSize: 13 }}>
-          留空表示该地区不售卖；前台查价回退顺序：精确地区 → GLOBAL。
-        </p>
-        <Form form={priceForm} layout="horizontal" labelCol={{ span: 6 }}>
+        <div style={{ background: '#f6f8ff', border: '1px solid #dbe3ff', borderRadius: 10, padding: 12, marginBottom: 16 }}>
+          <b>售价公式：</b>售价 = 账号分摊成本 + 支付手续费 + 售后准备金 + 运营费用 + 目标利润
+          <div style={{ color: '#666', marginTop: 4 }}>
+            示例：<b>120 = 80 成本 + 5 手续费 + 10 售后准备金 + 5 运营费用 + 20 利润</b>
+          </div>
+        </div>
+        <Form
+          form={priceForm}
+          layout="vertical"
+          onValuesChange={(changed) => {
+            const key = Object.keys(changed)[0] || '';
+            const region = REGIONS.find((r) => key.endsWith(`_${r}`));
+            if (!region || key.startsWith('price_') || key.startsWith('currency_')) return;
+            const v = priceForm.getFieldsValue();
+            const total = [
+              'costAmount', 'paymentFeeAmount', 'aftersalesReserveAmount',
+              'operationCostAmount', 'targetProfitAmount',
+            ].reduce((sum, name) => sum + Number(v[`${name}_${region}`] || 0), 0);
+            priceForm.setFieldsValue({ [`price_${region}`]: Math.round(total * 100) / 100 });
+          }}
+        >
           {REGIONS.map((region) => (
-            <Form.Item key={region} label={region} style={{ marginBottom: 12 }}>
-              <Space.Compact style={{ width: '100%' }}>
-                <Form.Item name={`currency_${region}`} noStyle>
-                  <Select style={{ width: 90 }} options={CURRENCIES.map((c) => ({ value: c, label: c }))} />
-                </Form.Item>
-                <Form.Item name={`price_${region}`} noStyle>
-                  <InputNumber
-                    min={0}
-                    step={0.01}
-                    style={{ flex: 1, width: '100%' }}
-                    placeholder="留空=不售卖"
-                  />
-                </Form.Item>
-              </Space.Compact>
-            </Form.Item>
+            <Card key={region} size="small" title={`地区：${region}`} style={{ marginBottom: 12 }}>
+              <Row gutter={10}>
+                <Col span={4}>
+                  <Form.Item label="币种" name={`currency_${region}`}>
+                    <Select options={CURRENCIES.map((c) => ({ value: c, label: c }))} />
+                  </Form.Item>
+                </Col>
+                {[
+                  ['costAmount', '账号成本'],
+                  ['paymentFeeAmount', '支付手续费'],
+                  ['aftersalesReserveAmount', '售后准备金'],
+                  ['operationCostAmount', '运营费用'],
+                  ['targetProfitAmount', '目标利润'],
+                ].map(([name, label]) => (
+                  <Col span={4} key={name}>
+                    <Form.Item label={label} name={`${name}_${region}`}>
+                      <InputNumber min={0} step={0.01} style={{ width: '100%' }} />
+                    </Form.Item>
+                  </Col>
+                ))}
+              </Row>
+              <div style={{ background: '#fff7e6', borderRadius: 8, padding: '9px 12px' }}>
+                <b>{priceValues[`currency_${region}`] || ''} {Number(priceValues[`price_${region}`] || 0).toFixed(2)}</b>
+                {' = '}
+                成本 {Number(priceValues[`costAmount_${region}`] || 0).toFixed(2)}
+                {' + '}手续费 {Number(priceValues[`paymentFeeAmount_${region}`] || 0).toFixed(2)}
+                {' + '}售后 {Number(priceValues[`aftersalesReserveAmount_${region}`] || 0).toFixed(2)}
+                {' + '}运营 {Number(priceValues[`operationCostAmount_${region}`] || 0).toFixed(2)}
+                {' + '}利润 {Number(priceValues[`targetProfitAmount_${region}`] || 0).toFixed(2)}
+              </div>
+              <Form.Item name={`price_${region}`} hidden><InputNumber /></Form.Item>
+            </Card>
           ))}
         </Form>
       </Modal>

@@ -8,7 +8,9 @@ import {
   Plan,
   Product,
   Slot,
+  SlotAssignment,
   Subscription,
+  toUsd,
 } from '../entities';
 
 /**
@@ -28,6 +30,8 @@ export class FulfillmentService {
     @InjectRepository(InventoryAccount)
     private readonly accounts: Repository<InventoryAccount>,
     @InjectRepository(Slot) private readonly slots: Repository<Slot>,
+    @InjectRepository(SlotAssignment)
+    private readonly assignments: Repository<SlotAssignment>,
     @InjectRepository(Subscription)
     private readonly subs: Repository<Subscription>,
   ) {}
@@ -55,6 +59,8 @@ export class FulfillmentService {
 
   /** 交付整单：返回是否全部完成 */
   async fulfill(order: Order): Promise<boolean> {
+    order.fulfillmentStatus = 'processing';
+    await this.orders.save(order);
     const items = await this.orderItems.findBy({
       orderId: order.id,
       status: 'pending',
@@ -72,10 +78,33 @@ export class FulfillmentService {
         status: 'active',
       });
       if (existing) {
-        const base = new Date(existing.expiresAt);
+        const startsAt = new Date(existing.expiresAt);
+        const base = new Date(startsAt);
         base.setMonth(base.getMonth() + months);
         existing.expiresAt = base;
         await this.subs.save(existing);
+        if (existing.slotId) {
+          const slot = await this.slots.findOneBy({ id: existing.slotId });
+          if (slot) {
+            await this.assignments.save(
+              this.assignments.create({
+                accountId: slot.accountId,
+                slotId: slot.id,
+                orderId: order.id,
+                orderItemId: item.id,
+                subscriptionId: existing.id,
+                startsAt,
+                endsAt: base,
+                saleAmount: item.unitPrice,
+                saleCurrency: item.currency,
+                saleUsd: toUsd(item.unitPrice, item.currency),
+                paymentFeeUsd: 0,
+                refundUsd: 0,
+                status: 'active',
+              }),
+            );
+          }
+        }
         item.status = 'done';
         await this.orderItems.save(item);
         await this.bumpSold(item.planId);
@@ -95,7 +124,7 @@ export class FulfillmentService {
       const startsAt = new Date();
       const expiresAt = new Date(startsAt);
       expiresAt.setMonth(expiresAt.getMonth() + months);
-      await this.subs.save(
+      const subscription = await this.subs.save(
         this.subs.create({
           userId: order.userId,
           orderId: order.id,
@@ -107,12 +136,31 @@ export class FulfillmentService {
           credentials: picked.account.credentials,
         }),
       );
+      await this.assignments.save(
+        this.assignments.create({
+          accountId: picked.account.id,
+          slotId: picked.slot.id,
+          orderId: order.id,
+          orderItemId: item.id,
+          subscriptionId: subscription.id,
+          startsAt,
+          endsAt: expiresAt,
+          saleAmount: item.unitPrice,
+          saleCurrency: item.currency,
+          saleUsd: toUsd(item.unitPrice, item.currency),
+          paymentFeeUsd: 0,
+          refundUsd: 0,
+          status: 'active',
+        }),
+      );
       item.status = 'done';
       await this.orderItems.save(item);
       await this.bumpSold(item.planId);
     }
 
     order.status = allDone ? 'delivered' : 'allocating';
+    order.fulfillmentStatus = allDone ? 'delivered' : 'partial';
+    if (allDone) order.deliveredAt = new Date();
     await this.orders.save(order);
     return allDone;
   }
@@ -149,6 +197,12 @@ export class FulfillmentService {
 
   /** 退款/撤销：吊销本单订阅并回收坑位；续费项回退顺延时长 */
   async revoke(order: Order) {
+    const assignments = await this.assignments.findBy({ orderId: order.id });
+    for (const assignment of assignments) {
+      assignment.status = 'refunded';
+      assignment.refundUsd = assignment.saleUsd;
+      await this.assignments.save(assignment);
+    }
     const items = await this.orderItems.findBy({ orderId: order.id });
     // 首购项：吊销 orderId 关联的订阅
     const directSubs = await this.subs.findBy({ orderId: order.id });

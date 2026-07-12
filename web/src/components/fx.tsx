@@ -304,9 +304,15 @@ export function ThemePicker() {
       <button
         className="theme-btn"
         title="切换主题风格"
+        aria-label="切换主题风格"
         onClick={() => setOpen((o) => !o)}
       >
-        🎨
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+          <path d="M12 3a9 9 0 1 0 0 18c1.4 0 2-1 1.4-2-.6-1.1.2-2 1.4-2H17a4 4 0 0 0 4-4c0-5-4-10-9-10z" />
+          <circle cx="8" cy="11" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="12" cy="8" r="1.2" fill="currentColor" stroke="none" />
+          <circle cx="16" cy="10" r="1.2" fill="currentColor" stroke="none" />
+        </svg>
       </button>
       {open && (
         <div className="theme-panel">

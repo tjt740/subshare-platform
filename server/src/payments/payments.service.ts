@@ -75,6 +75,7 @@ export class PaymentsService {
         }),
       );
       order.status = 'paid';
+      order.paymentStatus = 'paid';
       order.paidAt = new Date();
       await this.orders.save(order);
       await this.fulfillment.fulfill(order);
@@ -187,6 +188,7 @@ export class PaymentsService {
     });
     if (order && order.status === 'created') {
       order.status = 'paid';
+      order.paymentStatus = 'paid';
       order.paidAt = new Date();
       await this.orders.save(order);
       const payer = await this.users.findOneBy({ id: userId });

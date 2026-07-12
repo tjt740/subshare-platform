@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { api, CATEGORY_ICON, money, PROVIDERS, toUsd } from '../api';
+import { api, money, PROVIDERS, toUsd } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
+import Icon, { CATEGORY_ICON_NAME } from '../components/Icon';
 
 interface LineItem {
   planId: number;
@@ -137,7 +138,7 @@ export default function Checkout() {
         <h3>{t('checkout.list', { n: lines.length })}</h3>
         {lines.map((l) => (
           <div className="co-product" key={l.planId} style={{ marginBottom: 12 }}>
-            <div className="card-logo">{CATEGORY_ICON[l.category] ?? '📦'}</div>
+            <div className="card-logo"><Icon name={CATEGORY_ICON_NAME[l.category] ?? 'box'} size={24} /></div>
             <div style={{ flex: 1 }}>
               <b>{l.productTitle}</b>
               <span>
@@ -184,7 +185,7 @@ export default function Checkout() {
               disabled={!balanceEnough}
               onChange={() => setProvider('balance')}
             />
-            <span className="p-icon">💰</span>
+            <span className="p-icon"><Icon name="money" size={20} /></span>
             <span className="p-name">
               {t('checkout.balance')}
               <div className="p-desc">
@@ -208,7 +209,7 @@ export default function Checkout() {
                 checked={provider === p.value}
                 onChange={() => setProvider(p.value)}
               />
-              <span className="p-icon">{p.icon}</span>
+              <span className="p-icon"><Icon name={p.icon} size={20} /></span>
               <span className="p-name">
                 {p.name}
                 <div className="p-desc">{p.desc}</div>
@@ -224,7 +225,7 @@ export default function Checkout() {
               className="btn btn-ghost btn-sm"
               onClick={() => navigate('/account?tab=wallet')}
             >
-              💰 {t('checkout.goRecharge')}
+              <Icon name="wallet" size={14} /> {t('checkout.goRecharge')}
             </button>
             <span className="muted small">或直接选择上方银行卡 / 支付宝支付</span>
           </div>
@@ -251,7 +252,7 @@ export default function Checkout() {
         <Link to="/legal/privacy">《{t('legal.privacy')}》</Link>
       </p>
       <div className="pay-safety">
-        🔒 支付由第三方支付机构托管，平台不存储你的卡号与密码 · 全站 HTTPS 加密
+        <Icon name="lock" size={12} /> 支付由第三方支付机构托管，平台不存储你的卡号与密码 · 全站 HTTPS 加密
       </div>
     </div>
   );

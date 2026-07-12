@@ -3,6 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, money } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
+import { ConfettiBurst } from '../components/CanvasFx';
+import Icon from '../components/Icon';
 
 interface PaymentView {
   id: number;
@@ -17,10 +19,10 @@ interface PaymentView {
 }
 
 const PROVIDER_LABEL: Record<string, string> = {
-  'mock-card': 'Visa / Mastercard (Mock)',
-  'mock-alipay': 'Alipay (Mock)',
-  'mock-usdt': 'USDT (Mock)',
-  balance: '💰 Wallet',
+  'mock-card': 'Visa / Mastercard',
+  'mock-alipay': 'Alipay',
+  'mock-usdt': 'USDT',
+  balance: '钱包余额',
 };
 
 /** Mock 收银台 */
@@ -165,7 +167,8 @@ export default function Pay() {
 
         {payment.status === 'succeeded' && (
           <div className="pay-result ok">
-            <span className="big-ic">🎉</span>
+            <ConfettiBurst fire={payment.status === 'succeeded'} />
+            <span className="big-ic"><Icon name="check" size={48} /></span>
             <h3>{isRecharge ? t('pay.rechargedTitle') : t('pay.paidTitle')}</h3>
             <p>
               {isRecharge
@@ -190,7 +193,7 @@ export default function Pay() {
 
         {payment.status === 'failed' && (
           <div className="pay-result bad">
-            <span className="big-ic">😕</span>
+            <span className="big-ic"><Icon name="warn" size={44} /></span>
             <h3>{t('pay.failedTitle')}</h3>
             <p>{t('pay.failedDesc')}</p>
             <button className="btn btn-primary" disabled={busy} onClick={retry}>

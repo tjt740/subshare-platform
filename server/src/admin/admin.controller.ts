@@ -13,7 +13,9 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import {
+  CurrentUser,
   JwtAuthGuard,
+  JwtUser,
   Perm,
   PermGuard,
   Roles,
@@ -90,7 +92,7 @@ export class AdminController {
   @Perm('products')
   setPrices(
     @Param('id', ParseIntPipe) id: number,
-    @Body() body: { items: { region: string; currency: string; price: number }[] },
+    @Body() body: { items: any[] },
   ) {
     return this.admin.setPrices(id, body.items || []);
   }
@@ -103,23 +105,56 @@ export class AdminController {
   }
   @Post('inventory')
   @Perm('inventory')
-  createInventory(@Body() body: any) {
-    return this.admin.createInventory(body);
+  createInventory(@Body() body: any, @CurrentUser() user: JwtUser) {
+    return this.admin.createInventory(body, user.sub);
+  }
+  @Patch('inventory/:id')
+  @Perm('inventory')
+  updateInventory(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.admin.updateInventory(id, body, user.sub);
+  }
+  @Post('inventory/:id/costs')
+  @Perm('inventory')
+  addInventoryCost(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: any,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.admin.addAccountCost(id, body, user.sub);
   }
   @Patch('inventory/:id/health')
   @Perm('inventory')
   setHealth(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { health: 'ok' | 'banned' },
+    @CurrentUser() user: JwtUser,
   ) {
-    return this.admin.setInventoryHealth(id, body.health);
+    return this.admin.setInventoryHealth(id, body.health, user.sub);
   }
 
   // ---------- 订单 ----------
   @Get('orders')
   @Perm('orders')
-  listOrders(@Query('status') status?: string) {
-    return this.admin.listOrders(status || undefined);
+  listOrders(
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('dateFrom') dateFrom?: string,
+    @Query('dateTo') dateTo?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.admin.listOrders({
+      status: status || undefined,
+      search: search || undefined,
+      dateFrom: dateFrom || undefined,
+      dateTo: dateTo || undefined,
+      page: Number(page) || 1,
+      pageSize: Number(pageSize) || 20,
+    });
   }
   @Post('orders/:id/refund')
   @Perm('orders')
@@ -159,12 +194,26 @@ export class AdminController {
   @Get('site-config')
   @Perm('settings')
   getSiteConfig() {
-    return this.admin.getSiteConfig();
+    return this.admin.getSiteConfigWorkspace();
   }
-  @Put('site-config')
+  @Post('site-config/revisions')
   @Perm('settings')
-  setSiteConfig(@Body() body: any) {
-    return this.admin.setSiteConfig(body ?? {});
+  submitSiteConfig(@Body() body: any, @CurrentUser() user: JwtUser) {
+    return this.admin.submitSiteConfig(body?.config ?? {}, user.sub);
+  }
+  @Post('site-config/revisions/:id/review')
+  @Roles('super')
+  reviewSiteConfig(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { approve: boolean; reviewNote?: string },
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.admin.reviewSiteConfig(
+      id,
+      !!body.approve,
+      body.reviewNote || '',
+      user.sub,
+    );
   }
 
   // ---------- 库存坑位下钻 ----------
@@ -219,8 +268,14 @@ export class AdminController {
   review(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { approve: boolean; reviewNote?: string },
+    @CurrentUser() user: JwtUser,
   ) {
-    return this.admin.reviewSubmission(id, !!body.approve, body.reviewNote || '');
+    return this.admin.reviewSubmission(
+      id,
+      !!body.approve,
+      body.reviewNote || '',
+      user.sub,
+    );
   }
 
   // ---------- 管理员管理（仅超级管理员） ----------

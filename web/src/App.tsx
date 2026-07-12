@@ -19,6 +19,7 @@ import Account from './pages/Account';
 import Legal from './pages/Legal';
 import Forgot from './pages/Forgot';
 import Avatar from './components/Avatar';
+import Icon from './components/Icon';
 import SupportWidget from './components/SupportWidget';
 import {
   BootSplash,
@@ -82,7 +83,7 @@ function Header() {
           </nav>
           <div className="header-right">
             <Link to="/cart" className="cart-btn" aria-label={`${t('tabbar.cart')}（${cart.length}）`}>
-              <span aria-hidden>🛒</span>
+              <Icon name="cart" size={18} />
               {cart.length > 0 && <span className="cart-badge">{cart.length}</span>}
             </Link>
             {/* 桌面端完整控件 */}
@@ -106,7 +107,7 @@ function Header() {
                   onClick={() => navigate('/account?tab=wallet')}
                   onKeyDown={(e) => e.key === 'Enter' && navigate('/account?tab=wallet')}
                 >
-                  💰 ${user.balance.toFixed(2)}
+                  <Icon name="wallet" size={14} /> ${user.balance.toFixed(2)}
                 </span>
                 {/* 用户入口（移动端也保留） */}
                 <button
@@ -135,7 +136,7 @@ function Header() {
               aria-expanded={menuOpen}
               onClick={() => setMenuOpen((o) => !o)}
             >
-              ☰
+              <Icon name={menuOpen ? 'close' : 'menu'} size={20} />
             </button>
           </div>
         </div>
@@ -200,17 +201,17 @@ function MobileTabbar() {
   const tab = params.get('tab');
   const isAccount = location.pathname === '/account';
   const tabs = [
-    { to: '/', icon: '🏠', label: t('tabbar.home'), active: location.pathname === '/' },
-    { to: '/cart', icon: '🛒', label: t('tabbar.cart'), active: location.pathname === '/cart', badge: cart.length },
-    { to: '/account', icon: '📦', label: t('tabbar.subs'), active: isAccount && !tab },
-    { to: '/account?tab=wallet', icon: '💰', label: t('tabbar.wallet'), active: isAccount && tab === 'wallet' },
+    { to: '/', icon: 'home' as const, label: t('tabbar.home'), active: location.pathname === '/' },
+    { to: '/cart', icon: 'cart' as const, label: t('tabbar.cart'), active: location.pathname === '/cart', badge: cart.length },
+    { to: '/account', icon: 'box' as const, label: t('tabbar.subs'), active: isAccount && !tab },
+    { to: '/account?tab=wallet', icon: 'wallet' as const, label: t('tabbar.wallet'), active: isAccount && tab === 'wallet' },
   ];
   return (
     <nav className="mobile-tabbar">
       {tabs.map((x) => (
         <Link key={x.label} to={x.to} className={`mtab ${x.active ? 'active' : ''}`}>
           <span className="mi">
-            {x.icon}
+            <Icon name={x.icon} size={20} />
             {!!x.badge && <span className="cart-badge">{x.badge}</span>}
           </span>
           {x.label}

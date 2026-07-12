@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { api, CATEGORY_ICON, money } from '../api';
+import { api, money } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
+import Icon, { CATEGORY_ICON_NAME } from '../components/Icon';
 
 interface QuoteItem {
   planId: number;
@@ -80,7 +81,7 @@ export default function Cart() {
               const q = quote?.items.find((i) => i.planId === c.planId);
               return (
                 <div className="cart-item" key={c.planId}>
-                  <div className="card-logo">{CATEGORY_ICON[c.category] ?? '📦'}</div>
+                  <div className="card-logo"><Icon name={CATEGORY_ICON_NAME[c.category] ?? 'box'} size={24} /></div>
                   <div className="ci-info">
                     <b>{c.productTitle}</b>
                     <span className="muted small">{c.planName}</span>
@@ -136,7 +137,7 @@ export default function Cart() {
             </button>
             {!token && (
               <p className="tiny-note" style={{ marginTop: 8 }}>
-                🔒 {t('auth.loginNote')}
+                <Icon name="lock" size={12} /> {t('auth.loginNote')}
               </p>
             )}
             <div className="guarantee">

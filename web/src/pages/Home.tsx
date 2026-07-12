@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   api,
-  CATEGORY_ICON,
   CATEGORY_TINT,
   money,
   starStr,
@@ -11,6 +10,8 @@ import {
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
 import { Marquee, Reveal, SaleCountdown } from '../components/fx';
+import { HeroCanvas } from '../components/CanvasFx';
+import Icon, { CATEGORY_ICON_NAME } from '../components/Icon';
 
 interface ProductCard {
   id: number;
@@ -84,9 +85,7 @@ export default function Home() {
   return (
     <div>
       <section className="hero">
-        <div className="hero-emojis" aria-hidden>
-          <span style={{ right: '8%', top: '22%', ['--r' as any]: '6deg' }}>🎬</span>
-        </div>
+        <HeroCanvas height={360} />
         <span className="eyebrow">{t('hero.eyebrow')}</span>
         <h1>
           {sc(hero.t1, t('hero.t1'))}
@@ -98,7 +97,7 @@ export default function Home() {
         </h1>
         <p>{sc(hero.p, t('hero.p'))}</p>
         <a className="btn btn-primary btn-lg hero-cta" href="#catalog">
-          {t('catalog.heading')} →
+          {t('catalog.heading')} <Icon name="arrowRight" size={16} />
         </a>
       </section>
 
@@ -124,7 +123,11 @@ export default function Home() {
               className={`cat-chip ${cat === c ? 'active' : ''}`}
               onClick={() => setCat(c)}
             >
-              {c === '__all__' ? t('catalog.all') : `${CATEGORY_ICON[c] ?? '📦'} ${c}`}
+              {c === '__all__' ? (
+                <><Icon name="tag" size={14} /> {t('catalog.all')}</>
+              ) : (
+                <><Icon name={CATEGORY_ICON_NAME[c] ?? 'box'} size={14} /> {c}</>
+              )}
             </button>
           ))}
         </div>
@@ -181,7 +184,7 @@ export default function Home() {
                   className="card-banner"
                   style={{ '--tint1': tint[0], '--tint2': tint[1] } as React.CSSProperties}
                 >
-                  <div className="card-logo">{CATEGORY_ICON[p.category] ?? '📦'}</div>
+                  <div className="card-logo"><Icon name={CATEGORY_ICON_NAME[p.category] ?? 'box'} size={26} /></div>
                   <div>
                     <span className="chip">{p.category}</span>{' '}
                     <span className={`chip ${p.totalStock > 0 ? 'chip-ok' : 'chip-warn'}`}>
@@ -230,7 +233,7 @@ export default function Home() {
           <div className="hot-links">
             {hot.map((p) => (
               <Link key={p.id} className="btn btn-ghost btn-sm" to={`/p/${p.slug}`}>
-                {CATEGORY_ICON[p.category] ?? '📦'} {p.title}
+                <Icon name={CATEGORY_ICON_NAME[p.category] ?? 'box'} size={14} /> {p.title}
               </Link>
             ))}
           </div>

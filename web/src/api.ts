@@ -60,9 +60,9 @@ export const TICKET_STATUS_TEXT: Record<string, string> = {
 };
 
 export const PROVIDERS = [
-  { value: 'mock-card', icon: '💳', name: '银行卡', desc: 'Visa / Mastercard（Mock）' },
-  { value: 'mock-alipay', icon: '🅰️', name: '支付宝', desc: '扫码支付（Mock）' },
-  { value: 'mock-usdt', icon: '₮', name: 'USDT', desc: 'TRC20 / ERC20（Mock）' },
+  { value: 'mock-card', icon: 'card' as const, name: '银行卡', desc: 'Visa / Mastercard' },
+  { value: 'mock-alipay', icon: 'alipay' as const, name: '支付宝', desc: '扫码支付' },
+  { value: 'mock-usdt', icon: 'crypto' as const, name: 'USDT', desc: 'TRC20 / ERC20' },
 ];
 
 export const CATEGORY_ICON: Record<string, string> = {
