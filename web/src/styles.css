@@ -932,6 +932,17 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
 .as-item b { min-width: 180px; font-weight: 800; }
 .as-item span:not(.badge) { flex: 1; color: var(--muted); font-weight: 600; }
 
+/* 头像选择 */
+.avatar-grid { display: flex; flex-wrap: wrap; gap: 9px; }
+.avatar-chip {
+  width: 46px; height: 46px; border: var(--bw) solid var(--ink); border-radius: 13px;
+  background: var(--card); font-size: 23px; cursor: pointer; box-shadow: var(--sh-sm);
+  transition: all 0.2s var(--ease); display: flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+}
+.avatar-chip:hover { transform: translateY(-2px); }
+.avatar-chip.active { background: var(--yellow); transform: rotate(var(--rot)) scale(1.06); box-shadow: var(--sh); }
+
 /* ============ 无障碍：偏好减少动效 ============ */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

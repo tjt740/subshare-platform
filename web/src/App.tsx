@@ -92,8 +92,8 @@ function Header() {
                 >
                   💰 ${user.balance.toFixed(2)}
                 </span>
-                <span className="user-email" onClick={() => navigate('/account')}>
-                  {user.email}
+                <span className="user-email" onClick={() => navigate('/account?tab=profile')}>
+                  {user.avatar ?? '😀'} {user.nickname || user.email}
                 </span>
                 <button className="btn btn-ghost btn-sm" onClick={logout}>
                   {t('auth.logout')}

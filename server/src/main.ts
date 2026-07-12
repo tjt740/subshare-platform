@@ -59,8 +59,9 @@ async function bootstrap() {
   }
 
   const port = Number(process.env.PORT || 3001);
-  await app.listen(port);
+  const host = process.env.HOST || '0.0.0.0';
+  await app.listen(port, host);
   // eslint-disable-next-line no-console
-  console.log(`[subshare] API ready at http://localhost:${port}/api`);
+  console.log(`[subshare] API ready at http://${host}:${port}/api`);
 }
 bootstrap();

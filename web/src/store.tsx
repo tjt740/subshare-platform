@@ -11,6 +11,8 @@ import { api } from './api';
 export interface Profile {
   id: number;
   email: string;
+  nickname?: string;
+  avatar?: string;
   role: string;
   balance: number;
   createdAt: string;

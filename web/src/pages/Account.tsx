@@ -80,6 +80,7 @@ const TXN_TYPE: Record<string, string> = {
   refund: '退款',
 };
 const RECHARGE_AMOUNTS = [10, 25, 50, 100];
+const AVATARS = ['😀','😎','🦊','🐱','🐻','🐼','🦄','👾','🤖','🍊','⚡','🌈'];
 
 function CredentialRow({ label, value }: { label: string; value?: string }) {
   const [copied, setCopied] = useState(false);
@@ -149,6 +150,23 @@ export default function Account() {
   const [amount, setAmount] = useState(25);
   const [provider, setProvider] = useState('mock-card');
   const [recharging, setRecharging] = useState(false);
+  // 个人资料
+  const [nickname, setNickname] = useState('');
+  const [avatar, setAvatar] = useState('😀');
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileMsg, setProfileMsg] = useState('');
+  const [oldPwd, setOldPwd] = useState('');
+  const [newPwd, setNewPwd] = useState('');
+  const [confirmPwd, setConfirmPwd] = useState('');
+  const [changingPwd, setChangingPwd] = useState(false);
+  const [pwdMsg, setPwdMsg] = useState('');
+
+  useEffect(() => {
+    if (user) {
+      setNickname(user.nickname ?? '');
+      setAvatar(user.avatar ?? '😀');
+    }
+  }, [user]);
 
   const load = useCallback(() => {
     if (!token) return;
@@ -207,6 +225,49 @@ export default function Account() {
     }
   }
 
+  async function saveProfile() {
+    setSavingProfile(true);
+    setProfileMsg('');
+    try {
+      await api('/auth/profile', {
+        method: 'PATCH',
+        token,
+        body: JSON.stringify({ nickname, avatar }),
+      });
+      refreshUser();
+      setProfileMsg(t('profile.saved'));
+      setTimeout(() => setProfileMsg(''), 2500);
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setSavingProfile(false);
+    }
+  }
+
+  async function changePwd() {
+    if (newPwd !== confirmPwd) {
+      setPwdMsg(t('profile.pwdMismatch'));
+      return;
+    }
+    setChangingPwd(true);
+    setPwdMsg('');
+    try {
+      await api('/auth/change-password', {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ oldPassword: oldPwd, newPassword: newPwd }),
+      });
+      setPwdMsg(t('profile.pwdChanged'));
+      setOldPwd('');
+      setNewPwd('');
+      setConfirmPwd('');
+    } catch (e: any) {
+      setPwdMsg(e.message);
+    } finally {
+      setChangingPwd(false);
+    }
+  }
+
   /** 续费：同套餐再下一单，后端自动顺延到期时间 */
   function renew(sub: SubView) {
     navigate(`/checkout/${sub.planId}`);
@@ -230,6 +291,9 @@ export default function Account() {
         </button>
         <button className={tab === 'wallet' ? 'tab active' : 'tab'} onClick={() => setTab('wallet')}>
           {t('tab.wallet', { n: wallet?.balance.toFixed(2) ?? '0.00' })}
+        </button>
+        <button className={tab === 'profile' ? 'tab active' : 'tab'} onClick={() => setTab('profile')}>
+          {t('tab.profile')}
         </button>
       </div>
 
@@ -516,6 +580,78 @@ export default function Account() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* ---------------- 个人资料 ---------------- */}
+      {tab === 'profile' && user && (
+        <div className="checkout-wrap" style={{ marginTop: 4 }}>
+          <div className="panel">
+            <h3>{t('profile.title')}</h3>
+            <label className="field">
+              <span>{t('profile.avatar')}</span>
+            </label>
+            <div className="avatar-grid">
+              {AVATARS.map((a) => (
+                <button
+                  type="button"
+                  key={a}
+                  className={`avatar-chip ${avatar === a ? 'active' : ''}`}
+                  onClick={() => setAvatar(a)}
+                >
+                  {a}
+                </button>
+              ))}
+            </div>
+            <label className="field" style={{ marginTop: 14 }}>
+              <span>{t('profile.nickname')}</span>
+              <input
+                value={nickname}
+                maxLength={24}
+                placeholder={t('profile.nicknamePh')}
+                onChange={(e) => setNickname(e.target.value)}
+              />
+            </label>
+            <p className="tiny-note" style={{ textAlign: 'left' }}>
+              {t('profile.emailNote')}（{user.email}）
+            </p>
+            {profileMsg && <div className="alert alert-ok">{profileMsg}</div>}
+            <button
+              className="btn btn-primary btn-block"
+              disabled={savingProfile}
+              onClick={saveProfile}
+            >
+              {savingProfile ? t('profile.saving') : t('profile.save')}
+            </button>
+          </div>
+
+          <div className="panel">
+            <h3>{t('profile.pwdTitle')}</h3>
+            <label className="field">
+              <span>{t('profile.oldPwd')}</span>
+              <input type="password" value={oldPwd} onChange={(e) => setOldPwd(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>{t('profile.newPwd')}</span>
+              <input type="password" value={newPwd} onChange={(e) => setNewPwd(e.target.value)} />
+            </label>
+            <label className="field">
+              <span>{t('profile.confirmPwd')}</span>
+              <input type="password" value={confirmPwd} onChange={(e) => setConfirmPwd(e.target.value)} />
+            </label>
+            {pwdMsg && (
+              <div className={`alert ${pwdMsg.startsWith('✓') ? 'alert-ok' : 'alert-error'}`}>
+                {pwdMsg}
+              </div>
+            )}
+            <button
+              className="btn btn-primary btn-block"
+              disabled={changingPwd || !oldPwd || newPwd.length < 6 || !confirmPwd}
+              onClick={changePwd}
+            >
+              {t('profile.pwdBtn')}
+            </button>
           </div>
         </div>
       )}

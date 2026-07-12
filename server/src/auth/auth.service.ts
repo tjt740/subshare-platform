@@ -41,11 +41,42 @@ export class AuthService {
     return {
       id: user.id,
       email: user.email,
+      nickname: user.nickname || '',
+      avatar: user.avatar || '😀',
       role: user.role,
       permissions,
       balance: user.balance,
       createdAt: user.createdAt,
     };
+  }
+
+  /** 修改个人资料（昵称/头像；邮箱为登录账号不支持修改） */
+  async updateProfile(
+    userId: number,
+    data: { nickname?: string; avatar?: string },
+  ) {
+    const user = await this.users.findOneBy({ id: userId });
+    if (!user) throw new UnauthorizedException();
+    if (data.nickname !== undefined) {
+      user.nickname = data.nickname.trim().slice(0, 24);
+    }
+    if (data.avatar !== undefined) {
+      user.avatar = data.avatar.trim().slice(0, 8) || '😀';
+    }
+    await this.users.save(user);
+    return this.toProfile(user);
+  }
+
+  /** 修改密码：验证旧密码 */
+  async changePassword(userId: number, oldPassword: string, newPassword: string) {
+    const user = await this.users.findOneBy({ id: userId });
+    if (!user) throw new UnauthorizedException();
+    if (!(await bcrypt.compare(oldPassword, user.passwordHash))) {
+      throw new BadRequestException('当前密码不正确');
+    }
+    user.passwordHash = await bcrypt.hash(newPassword, 10);
+    await this.users.save(user);
+    return { ok: true };
   }
 
   private async createAccount(

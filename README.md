@@ -127,6 +127,17 @@ JWT_SECRET=xxx npm run dev:server       # 环境变量
 5. **异步化**：交付/补发/到期提醒移入 BullMQ 队列；邮件通知（SES/Resend）
 6. **待扩展**：优惠券、联盟推广、多语言 i18n、汇率自动同步（规划文档已有设计）
 
+## 阿里云部署
+
+项目已配置为 Nginx 对外监听 TCP `9999`，NestJS API 仅在服务器本机监听 `9998`。用户前台位于 `/`，运营后台位于 `/admin/`。
+
+```bash
+cp .deploy.env.example .deploy.env
+npm run deploy:aliyun
+```
+
+完整配置、GitHub Actions 密钥和运维命令见 [`docs/aliyun-deploy.md`](docs/aliyun-deploy.md)。
+
 ## 已验证（沙箱实测）
 
 - 三端 `tsc` 严格模式零错误 + vite 构建通过

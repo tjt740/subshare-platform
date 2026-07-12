@@ -1,0 +1,91 @@
+name: Deploy to Aliyun
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+      - master
+
+concurrency:
+  group: subshare-platform-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      ALIYUN_HOST: ${{ secrets.ALIYUN_HOST }}
+      ALIYUN_USER: ${{ secrets.ALIYUN_USER }}
+      ALIYUN_PORT: ${{ secrets.ALIYUN_PORT }}
+      ALIYUN_SSH_KEY: ${{ secrets.ALIYUN_SSH_KEY }}
+      ALIYUN_DEPLOY_PATH: ${{ secrets.ALIYUN_DEPLOY_PATH }}
+
+    steps:
+      - name: Check deploy secrets
+        id: config
+        shell: bash
+        run: |
+          if [[ -z "$ALIYUN_HOST" || -z "$ALIYUN_USER" || -z "$ALIYUN_SSH_KEY" || -z "$ALIYUN_DEPLOY_PATH" ]]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Aliyun deploy secrets are not configured; skipping deploy."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: steps.config.outputs.configured == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Validate build
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          npm ci
+          npm run build
+
+      - name: Prepare SSH
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y rsync openssh-client
+          mkdir -p ~/.ssh
+          printf '%s\n' "$ALIYUN_SSH_KEY" > ~/.ssh/aliyun_deploy_key
+          chmod 600 ~/.ssh/aliyun_deploy_key
+          ssh-keyscan -p "${ALIYUN_PORT:-22}" "$ALIYUN_HOST" >> ~/.ssh/known_hosts
+
+      - name: Sync code
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          ssh -i ~/.ssh/aliyun_deploy_key -p "${ALIYUN_PORT:-22}" "$ALIYUN_USER@$ALIYUN_HOST" \
+            "mkdir -p '$ALIYUN_DEPLOY_PATH'"
+          rsync -az --delete \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.deploy.env' \
+            --exclude 'node_modules/' \
+            --exclude 'web/dist/' \
+            --exclude 'admin/dist/' \
+            --exclude 'server/dist/' \
+            --exclude 'server/data/*.db*' \
+            --exclude '*.log' \
+            -e "ssh -i ~/.ssh/aliyun_deploy_key -p ${ALIYUN_PORT:-22}" \
+            ./ "$ALIYUN_USER@$ALIYUN_HOST:$ALIYUN_DEPLOY_PATH/"
+
+      - name: Deploy services
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          ssh -i ~/.ssh/aliyun_deploy_key -p "${ALIYUN_PORT:-22}" "$ALIYUN_USER@$ALIYUN_HOST" \
+            "cd '$ALIYUN_DEPLOY_PATH' && PUBLIC_PORT=9999 API_PORT=9998 SERVER_NAME='$ALIYUN_HOST' ./scripts/deploy_server.sh"
+
+      - name: Verify public health
+        if: steps.config.outputs.configured == 'true'
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 2 \
+            "http://$ALIYUN_HOST:9999/api/health"

@@ -5,6 +5,8 @@ import { api } from '../api';
 interface UserRow {
   id: number;
   email: string;
+  nickname?: string;
+  avatar?: string;
   role: 'user' | 'admin';
   status: 'active' | 'banned';
   balance: number;
@@ -45,7 +47,16 @@ export default function Users() {
         dataSource={rows}
         columns={[
           { title: 'ID', dataIndex: 'id', width: 60 },
-          { title: '邮箱', dataIndex: 'email' },
+          {
+            title: '用户',
+            dataIndex: 'email',
+            render: (email: string, r: UserRow) => (
+              <span>
+                {r.avatar ?? '😀'} {r.nickname ? `${r.nickname} · ` : ''}
+                {email}
+              </span>
+            ),
+          },
           {
             title: '角色',
             dataIndex: 'role',

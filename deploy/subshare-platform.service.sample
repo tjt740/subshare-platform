@@ -1,0 +1,18 @@
+[Unit]
+Description=SubShare NestJS API
+After=network.target
+
+[Service]
+Type=simple
+User=admin
+Group=admin
+WorkingDirectory=/home/admin/subshare-platform
+EnvironmentFile=/etc/subshare-platform.env
+ExecStart=/usr/bin/node /home/admin/subshare-platform/server/dist/main.js
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

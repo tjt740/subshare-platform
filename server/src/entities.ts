@@ -21,6 +21,8 @@ export class User {
   @Column({ type: 'text' })
   email: string;
   @Column({ type: 'text' }) passwordHash: string;
+  @Column({ type: 'text', default: '' }) nickname: string;
+  @Column({ type: 'text', default: '😀' }) avatar: string;
   @Column({ type: 'text', default: 'user' })
   role: 'user' | 'admin' | 'super' | 'supplier';
   @Column({ type: 'text', default: '[]' }) permissions: string; // JSON string[]

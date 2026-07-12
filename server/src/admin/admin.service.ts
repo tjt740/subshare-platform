@@ -309,6 +309,8 @@ export class AdminService {
     return users.map((u) => ({
       id: u.id,
       email: u.email,
+      nickname: u.nickname || '',
+      avatar: u.avatar || '😀',
       role: u.role,
       status: u.status,
       balance: u.balance,
