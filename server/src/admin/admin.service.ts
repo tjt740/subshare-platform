@@ -17,6 +17,7 @@ import {
   Plan,
   PriceBook,
   Product,
+  SiteSetting,
   Slot,
   Subscription,
   SupplierSubmission,
@@ -52,6 +53,8 @@ export class AdminService {
     private readonly submissions: Repository<SupplierSubmission>,
     @InjectRepository(WalletTransaction)
     private readonly txns: Repository<WalletTransaction>,
+    @InjectRepository(SiteSetting)
+    private readonly settings: Repository<SiteSetting>,
     private readonly fulfillment: FulfillmentService,
     private readonly ordersService: OrdersService,
   ) {}
@@ -391,6 +394,50 @@ export class AdminService {
     user.status = status;
     await this.users.save(user);
     return { id: user.id, status: user.status };
+  }
+
+  // ---------- 站点配置 ----------
+  async getSiteConfig() {
+    const row = await this.settings.findOneBy({ key: 'site' });
+    try {
+      return row ? JSON.parse(row.value) : {};
+    } catch {
+      return {};
+    }
+  }
+
+  async setSiteConfig(config: Record<string, unknown>) {
+    let row = await this.settings.findOneBy({ key: 'site' });
+    if (!row) row = this.settings.create({ key: 'site' });
+    row.value = JSON.stringify(config ?? {});
+    await this.settings.save(row);
+    return this.getSiteConfig();
+  }
+
+  /** 库存下钻：单账号全部坑位 + 占用订单/用户 */
+  async accountSlots(accountId: number) {
+    const account = await this.accounts.findOneBy({ id: accountId });
+    if (!account) throw new NotFoundException('账号不存在');
+    const slots = await this.slots.find({
+      where: { accountId },
+      order: { id: 'ASC' },
+    });
+    const orderIds = [...new Set(slots.map((x) => x.orderId).filter(Boolean))] as number[];
+    const orders = orderIds.length ? await this.orders.findBy({ id: In(orderIds) }) : [];
+    const orderMap = new Map(orders.map((o) => [o.id, o]));
+    const userIds = [...new Set(orders.map((o) => o.userId))];
+    const users = userIds.length ? await this.users.findBy({ id: In(userIds) }) : [];
+    const userMap = new Map(users.map((u) => [u.id, u.email]));
+    return slots.map((slot) => {
+      const order = slot.orderId ? orderMap.get(slot.orderId) : undefined;
+      return {
+        id: slot.id,
+        status: slot.status,
+        orderId: slot.orderId,
+        orderNo: order?.orderNo ?? null,
+        userEmail: order ? (userMap.get(order.userId) ?? '-') : null,
+      };
+    });
   }
 
   // ---------- 客服工单 ----------

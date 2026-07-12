@@ -2,7 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import * as path from 'path';
-import { ALL_ENTITIES } from './entities';
+import { ALL_ENTITIES, SiteSetting } from './entities';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { OrdersModule } from './orders/orders.module';
@@ -27,6 +27,7 @@ export const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
       entities: ALL_ENTITIES,
       synchronize: true, // 演示项目自动建表；生产请改用 migration
     }),
+    TypeOrmModule.forFeature([SiteSetting]),
     JwtModule.register({
       global: true,
       secret: JWT_SECRET,

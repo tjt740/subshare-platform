@@ -239,6 +239,16 @@ export class SupplierSubmission {
   @Column({ type: 'datetime', nullable: true }) reviewedAt: Date | null;
 }
 
+/** 站点配置（后台可改前台的每一处文案/数据） */
+@Entity('site_settings')
+export class SiteSetting {
+  @PrimaryGeneratedColumn() id: number;
+  @Index({ unique: true })
+  @Column({ type: 'text' })
+  key: string;
+  @Column({ type: 'text', default: '{}' }) value: string; // JSON
+}
+
 export const ALL_ENTITIES = [
   User,
   Product,
@@ -254,6 +264,7 @@ export const ALL_ENTITIES = [
   Ticket,
   TicketMessage,
   SupplierSubmission,
+  SiteSetting,
 ];
 
 export const REGIONS = ['US', 'EU', 'CN', 'GLOBAL'] as const;
@@ -312,4 +323,5 @@ export const ADMIN_PERMISSIONS = [
   'users',
   'tickets',
   'suppliers',
+  'settings',
 ] as const;

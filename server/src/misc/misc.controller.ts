@@ -1,5 +1,8 @@
 import { Controller, Get, Req } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { Request } from 'express';
+import { SiteSetting } from '../entities';
 
 const VERSION = 'v4';
 const BOOT_AT = Date.now();
@@ -7,6 +10,22 @@ const BOOT_AT = Date.now();
 /** 健康检查 + 地区/语言探测（前台状态时钟与 i18n 自动跟随使用） */
 @Controller()
 export class MiscController {
+  constructor(
+    @InjectRepository(SiteSetting)
+    private readonly settings: Repository<SiteSetting>,
+  ) {}
+
+  /** 前台站点配置（后台「站点设置」可改；空值走前台内置默认） */
+  @Get('site-config')
+  async siteConfig() {
+    const row = await this.settings.findOneBy({ key: 'site' });
+    try {
+      return row ? JSON.parse(row.value) : {};
+    } catch {
+      return {};
+    }
+  }
+
   /** 前台状态条轮询：证明 API 存活 */
   @Get('health')
   health() {

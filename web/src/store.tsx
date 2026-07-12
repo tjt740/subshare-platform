@@ -30,6 +30,7 @@ export interface CartItem {
 }
 
 interface AppState {
+  siteCfg: any;
   token: string | null;
   user: Profile | null;
   region: string;
@@ -64,6 +65,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     () => localStorage.getItem('ss_region') || 'US',
   );
   const [cart, setCart] = useState<CartItem[]>(loadCart);
+  const [siteCfg, setSiteCfg] = useState<any>({});
+
+  // 站点配置：后台「站点设置」可实时修改前台文案
+  useEffect(() => {
+    fetch('/api/site-config')
+      .then((r) => r.json())
+      .then(setSiteCfg)
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -156,10 +166,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo(
     () => ({
+      siteCfg,
       token, user, region, setRegion, login, register, logout, refreshUser,
       cart, addToCart, removeFromCart, clearCart,
     }),
-    [token, user, region, setRegion, login, register, logout, refreshUser, cart, addToCart, removeFromCart, clearCart],
+    [siteCfg, token, user, region, setRegion, login, register, logout, refreshUser, cart, addToCart, removeFromCart, clearCart],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

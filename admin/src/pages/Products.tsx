@@ -2,12 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Button,
   Card,
+  Col,
   Drawer,
   Form,
   Input,
   InputNumber,
   Modal,
   Popconfirm,
+  Row,
   Select,
   Space,
   Switch,
@@ -35,6 +37,70 @@ const parseMeta = (m?: string) => {
     return {};
   }
 };
+
+const CAT_ICON: Record<string, string> = {
+  流媒体: '🎬', 音乐: '🎵', 'AI 工具': '🤖', 办公: '💼', 学习: '📚', 游戏: '🎮',
+};
+const CAT_TINT: Record<string, string> = {
+  流媒体: '#fb9920', 音乐: '#5fc27e', 'AI 工具': '#8f7bf1', 办公: '#4fb8d8', 学习: '#ffcf3f', 游戏: '#ff5d8f',
+};
+
+/** 商品实时预览（前台 Supari 卡片风格；纯本地渲染，不落库） */
+function ProductPreview({ form, open }: { form: any; open: boolean }) {
+  const v: any = Form.useWatch([], form) || {};
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => tick((x) => x + 1), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  if (!open) return null;
+  const cat = v.category || '流媒体';
+  const icon = CAT_ICON[cat] ?? '📦';
+  const tint = CAT_TINT[cat] ?? '#fb9920';
+  const saleLeft = v.saleEndsAt ? new Date(v.saleEndsAt).getTime() - Date.now() : 0;
+  const fmtLeft = () => {
+    const s = Math.floor(saleLeft / 1000);
+    const p = (n: number) => String(n).padStart(2, '0');
+    return `${Math.floor(s / 86400) > 0 ? Math.floor(s / 86400) + 'd ' : ''}${p(Math.floor((s % 86400) / 3600))}:${p(Math.floor((s % 3600) / 60))}:${p(s % 60)}`;
+  };
+  return (
+    <div style={{ position: 'sticky', top: 0 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: '#888', marginBottom: 8, letterSpacing: 1 }}>
+        👁 前台实时预览
+        <Tag color="green" style={{ marginLeft: 8 }}>未保存 · 仅预览</Tag>
+      </div>
+      {/* 商品卡 */}
+      <div style={{ border: '2px solid #161412', borderRadius: 16, overflow: 'hidden', boxShadow: '4px 4px 0 #161412', background: '#fffdf6', maxWidth: 320 }}>
+        <div style={{ height: 92, background: tint, borderBottom: '2px solid #161412', display: 'flex', alignItems: 'center', padding: '0 18px', gap: 12, position: 'relative' }}>
+          <div style={{ width: 50, height: 50, borderRadius: 13, background: '#fffdf6', border: '2px solid #161412', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, boxShadow: '3px 3px 0 #161412' }}>{icon}</div>
+          <span style={{ fontSize: 11.5, fontWeight: 800, background: '#fffdf6', border: '1.5px solid #161412', borderRadius: 999, padding: '2px 10px' }}>{cat}</span>
+          {saleLeft > 0 && (
+            <span style={{ position: 'absolute', left: 14, bottom: 8, background: '#f62c2b', color: '#fff', border: '1.5px solid #161412', borderRadius: 999, padding: '2px 10px', fontSize: 11, fontWeight: 800 }}>
+              {v.saleLabel || '⚡ 限时特惠'} ⏳ {fmtLeft()}
+            </span>
+          )}
+        </div>
+        <div style={{ padding: '15px 18px' }}>
+          <div style={{ fontFamily: 'Archivo Black, sans-serif', fontSize: 17, fontWeight: 800 }}>{v.title || '（商品标题）'}</div>
+          <div style={{ color: '#7d766b', fontSize: 13, margin: '6px 0', minHeight: 36, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+            {v.description || '（商品描述预览……）'}
+          </div>
+          <div style={{ fontSize: 12, color: '#999' }}>slug: <code>{v.slug || '—'}</code> · 排序 {v.sort ?? 0}</div>
+        </div>
+      </div>
+      {/* 详情要素 */}
+      <div style={{ marginTop: 14, background: '#fff', border: '1px solid #e5e7ef', borderRadius: 12, padding: '12px 14px', fontSize: 13, lineHeight: 1.9 }}>
+        <div><b>🚚 交付方式：</b>{v.deliveryMethod || '账号密码'}</div>
+        <div><b>⚡ 交付时效：</b>{v.deliveryTime || '支付后自动交付'}</div>
+        <div><b>🛡️ 售后质保：</b>{v.warranty || '（未填）'}</div>
+        <div><b>⏳ 特惠：</b>{saleLeft > 0 ? `${v.saleLabel || '限时特惠'}，剩 ${fmtLeft()}` : '未开启'}</div>
+      </div>
+      <div style={{ marginTop: 10, fontSize: 11.5, color: '#aaa' }}>
+        * 价格/库存来自套餐与账号池，不在此预览
+      </div>
+    </div>
+  );
+}
 interface PlanRow {
   id: number;
   productId: number;
@@ -299,64 +365,73 @@ export default function Products() {
         ]}
       />
 
-      {/* 商品编辑 */}
+      {/* 商品编辑：左表单 + 右实时预览（预览为本地渲染，不落库，避免改错直接同步前台） */}
       <Modal
-        title={editingProduct ? '编辑商品' : '新建商品'}
+        title={editingProduct ? '编辑商品（左改右预览，确认无误再保存）' : '新建商品'}
         open={productModal}
         onOk={saveProduct}
         onCancel={() => setProductModal(false)}
+        okText="保存并同步前台"
+        width={920}
         destroyOnClose
       >
-        <Form form={productForm} layout="vertical">
-          <Form.Item label="标题" name="title" rules={[{ required: true }]}>
-            <Input placeholder="StreamMax Premium 4K" />
-          </Form.Item>
-          <Form.Item
-            label="slug（URL 标识，唯一）"
-            name="slug"
-            rules={[{ required: true, pattern: /^[a-z0-9-]+$/, message: '仅小写字母/数字/中划线' }]}
-          >
-            <Input placeholder="streammax-premium" disabled={!!editingProduct} />
-          </Form.Item>
-          <Form.Item label="分类" name="category" initialValue="流媒体">
-            <Select
-              options={['流媒体', '音乐', 'AI 工具', '办公', '学习', '游戏'].map(
-                (c) => ({ value: c, label: c }),
-              )}
-            />
-          </Form.Item>
-          <Form.Item label="描述" name="description">
-            <Input.TextArea rows={3} />
-          </Form.Item>
-          <Form.Item label="排序（越小越靠前）" name="sort" initialValue={0}>
-            <InputNumber min={0} style={{ width: '100%' }} />
-          </Form.Item>
-          <div style={{ borderTop: '1px dashed #ddd', margin: '4px 0 14px', paddingTop: 10, fontWeight: 700, fontSize: 13 }}>
-            🚚 交付与售后（前台商品页/订阅卡展示）
-          </div>
-          <Form.Item label="交付方式" name="deliveryMethod" initialValue="账号密码">
-            <Select
-              options={['账号密码', '家庭组邀请', '团队席位账号', '代充值', '其他'].map(
-                (v) => ({ value: v, label: v }),
-              )}
-            />
-          </Form.Item>
-          <Form.Item label="交付时效说明" name="deliveryTime">
-            <Input placeholder="支付后 60 秒内自动发放" />
-          </Form.Item>
-          <Form.Item label="质保/售后政策" name="warranty">
-            <Input placeholder="有效期内封号免费补发，工单 2 小时内响应" />
-          </Form.Item>
-          <div style={{ borderTop: '1px dashed #ddd', margin: '4px 0 14px', paddingTop: 10, fontWeight: 700, fontSize: 13 }}>
-            ⏳ 特惠倒计时（前台商品卡与详情页展示）
-          </div>
-          <Form.Item label="特惠截止时间（留空=关闭特惠）" name="saleEndsAt">
-            <Input type="datetime-local" />
-          </Form.Item>
-          <Form.Item label="特惠标签" name="saleLabel">
-            <Input placeholder="⚡ 限时特惠" />
-          </Form.Item>
-        </Form>
+        <Row gutter={20}>
+          <Col xs={24} md={13}>
+            <Form form={productForm} layout="vertical">
+              <Form.Item label="标题" name="title" rules={[{ required: true }]}>
+                <Input placeholder="StreamMax Premium 4K" />
+              </Form.Item>
+              <Form.Item
+                label="slug（URL 标识，唯一）"
+                name="slug"
+                rules={[{ required: true, pattern: /^[a-z0-9-]+$/, message: '仅小写字母/数字/中划线' }]}
+              >
+                <Input placeholder="streammax-premium" disabled={!!editingProduct} />
+              </Form.Item>
+              <Form.Item label="分类" name="category" initialValue="流媒体">
+                <Select
+                  options={['流媒体', '音乐', 'AI 工具', '办公', '学习', '游戏'].map(
+                    (c) => ({ value: c, label: c }),
+                  )}
+                />
+              </Form.Item>
+              <Form.Item label="描述" name="description">
+                <Input.TextArea rows={3} />
+              </Form.Item>
+              <Form.Item label="排序（越小越靠前）" name="sort" initialValue={0}>
+                <InputNumber min={0} style={{ width: '100%' }} />
+              </Form.Item>
+              <div style={{ borderTop: '1px dashed #ddd', margin: '4px 0 14px', paddingTop: 10, fontWeight: 700, fontSize: 13 }}>
+                🚚 交付与售后（前台商品页/订阅卡展示）
+              </div>
+              <Form.Item label="交付方式" name="deliveryMethod" initialValue="账号密码">
+                <Select
+                  options={['账号密码', '家庭组邀请', '团队席位账号', '代充值', '其他'].map(
+                    (v) => ({ value: v, label: v }),
+                  )}
+                />
+              </Form.Item>
+              <Form.Item label="交付时效说明" name="deliveryTime">
+                <Input placeholder="支付后 60 秒内自动发放" />
+              </Form.Item>
+              <Form.Item label="质保/售后政策" name="warranty">
+                <Input placeholder="有效期内封号免费补发，工单 2 小时内响应" />
+              </Form.Item>
+              <div style={{ borderTop: '1px dashed #ddd', margin: '4px 0 14px', paddingTop: 10, fontWeight: 700, fontSize: 13 }}>
+                ⏳ 特惠倒计时（前台商品卡与详情页展示）
+              </div>
+              <Form.Item label="特惠截止时间（留空=关闭特惠）" name="saleEndsAt">
+                <Input type="datetime-local" />
+              </Form.Item>
+              <Form.Item label="特惠标签" name="saleLabel">
+                <Input placeholder="⚡ 限时特惠" />
+              </Form.Item>
+            </Form>
+          </Col>
+          <Col xs={24} md={11}>
+            <ProductPreview form={productForm} open={productModal} />
+          </Col>
+        </Row>
       </Modal>
 
       {/* 套餐抽屉 */}

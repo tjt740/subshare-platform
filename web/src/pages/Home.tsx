@@ -35,9 +35,15 @@ function savePercent(p: ProductCard) {
   return pct > 0 ? pct : null;
 }
 
+const sc = (v: any, fb: string) => (typeof v === 'string' && v.trim() ? v : fb);
+
 export default function Home() {
-  const { region } = useApp();
+  const { region, siteCfg } = useApp();
   const { t, tList } = useI18n();
+  const hero = siteCfg?.hero ?? {};
+  const trust: { b?: string; s?: string }[] = Array.isArray(siteCfg?.trust)
+    ? siteCfg.trust
+    : [];
   const [products, setProducts] = useState<ProductCard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -72,27 +78,27 @@ export default function Home() {
           <span style={{ right: '10%', top: '66%', animationDelay: '0.8s', ['--r' as any]: '-10deg' }}>🎵</span>
           <span style={{ right: '30%', top: '20%', animationDelay: '1.6s', ['--r' as any]: '6deg' }}>🤖</span>
         </div>
-        <div className="spin-badge">{t('hero.badge')}</div>
+        <div className="spin-badge">{sc(hero.badge, t('hero.badge'))}</div>
         <span className="eyebrow">{t('hero.eyebrow')}</span>
         <h1>
-          {t('hero.t1')}
-          <span className="hollow">{t('hero.t2')}</span>
+          {sc(hero.t1, t('hero.t1'))}
+          <span className="hollow">{sc(hero.t2, t('hero.t2'))}</span>
           <br />
-          {t('hero.t3')}
-          <span className="tilt">80%</span>
+          {sc(hero.t3, t('hero.t3'))}
+          <span className="tilt">{sc(hero.pct, '80%')}</span>
           <span className="red">.</span>
         </h1>
-        <p>{t('hero.p')}</p>
+        <p>{sc(hero.p, t('hero.p'))}</p>
       </section>
 
       <Marquee className="strip" items={tList('strip.items')} />
 
       <Reveal>
         <div className="trust-bar">
-          <div className="trust-item"><b>50,000+</b><span>{t('trust.users')}</span></div>
-          <div className="trust-item"><b>99.6%</b><span>{t('trust.rate')}</span></div>
-          <div className="trust-item"><b>&lt; 60s</b><span>{t('trust.deliver')}</span></div>
-          <div className="trust-item"><b>7×24</b><span>{t('trust.support')}</span></div>
+          <div className="trust-item"><b>{sc(trust[0]?.b, '50,000+')}</b><span>{sc(trust[0]?.s, t('trust.users'))}</span></div>
+          <div className="trust-item"><b>{sc(trust[1]?.b, '99.6%')}</b><span>{sc(trust[1]?.s, t('trust.rate'))}</span></div>
+          <div className="trust-item"><b>{sc(trust[2]?.b, '< 60s')}</b><span>{sc(trust[2]?.s, t('trust.deliver'))}</span></div>
+          <div className="trust-item"><b>{sc(trust[3]?.b, '7×24')}</b><span>{sc(trust[3]?.s, t('trust.support'))}</span></div>
         </div>
       </Reveal>
 

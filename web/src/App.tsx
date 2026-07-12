@@ -45,8 +45,10 @@ function LocalePath() {
   return null;
 }
 
+const sc = (v: any, fb: string) => (typeof v === 'string' && v.trim() ? v : fb);
+
 function Header() {
-  const { user, region, setRegion, logout, cart } = useApp();
+  const { user, region, setRegion, logout, cart, siteCfg } = useApp();
   const { t, tList } = useI18n();
   const navigate = useNavigate();
   const regionOptions = [
@@ -56,7 +58,7 @@ function Header() {
   ];
   return (
     <>
-      <Marquee items={tList('announce.items')} className="announce" />
+      <Marquee items={Array.isArray(siteCfg?.announce) && siteCfg.announce.length ? siteCfg.announce : tList('announce.items')} className="announce" />
       <header className="site-header">
         <div className="container header-inner">
           <Link to="/" className="brand">
@@ -151,6 +153,8 @@ function MobileTabbar() {
 
 function Footer() {
   const { t } = useI18n();
+  const { siteCfg } = useApp();
+  const f = siteCfg?.footer ?? {};
   return (
     <footer className="site-footer">
       <div className="footer-mega">SubShare✺</div>
@@ -162,8 +166,8 @@ function Footer() {
       <div className="container footer-inner">
         <div>
           <h4>{t('footer.about')}</h4>
-          <p>{t('footer.aboutP1')}</p>
-          <p>{t('footer.aboutP2')}</p>
+          <p>{sc(f.aboutP1, t('footer.aboutP1'))}</p>
+          <p>{sc(f.aboutP2, t('footer.aboutP2'))}</p>
         </div>
         <div>
           <h4>{t('footer.help')}</h4>
@@ -173,9 +177,9 @@ function Footer() {
         </div>
         <div>
           <h4>{t('footer.guarantee')}</h4>
-          <p>{t('footer.g1')}</p>
-          <p>{t('footer.g2')}</p>
-          <p>{t('footer.g3')}</p>
+          <p>{sc(f.g1, t('footer.g1'))}</p>
+          <p>{sc(f.g2, t('footer.g2'))}</p>
+          <p>{sc(f.g3, t('footer.g3'))}</p>
         </div>
       </div>
       <div className="container">

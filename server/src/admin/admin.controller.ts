@@ -155,6 +155,25 @@ export class AdminController {
     return this.admin.setUserStatus(id, body.status);
   }
 
+  // ---------- 站点配置 ----------
+  @Get('site-config')
+  @Perm('settings')
+  getSiteConfig() {
+    return this.admin.getSiteConfig();
+  }
+  @Put('site-config')
+  @Perm('settings')
+  setSiteConfig(@Body() body: any) {
+    return this.admin.setSiteConfig(body ?? {});
+  }
+
+  // ---------- 库存坑位下钻 ----------
+  @Get('inventory/:id/slots')
+  @Perm('inventory')
+  accountSlots(@Param('id', ParseIntPipe) id: number) {
+    return this.admin.accountSlots(id);
+  }
+
   // ---------- 客服工单 ----------
   @Get('tickets')
   @Perm('tickets')
