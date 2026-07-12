@@ -25,9 +25,29 @@ import {
   ThemePicker,
 } from './components/fx';
 
+/**
+ * URL 语言切换：/zh /en 前缀 = 手动锁定语言；/auto = 恢复跟随 IP/地区。
+ * 例：/zh/cart -> 锁定中文并跳转 /cart；无前缀时语言自动跟随地区。
+ */
+function LocalePath() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { setPref } = useI18n();
+  React.useEffect(() => {
+    const m = location.pathname.match(/^\/(zh|en|auto)(\/|$)/);
+    if (!m) return;
+    setPref(m[1] === 'auto' ? 'auto' : (m[1] as 'zh' | 'en'));
+    const rest =
+      location.pathname.slice(m[0].length - (m[2] === '/' ? 1 : 0)) || '/';
+    navigate(rest + location.search, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
+  return null;
+}
+
 function Header() {
   const { user, region, setRegion, logout, cart } = useApp();
-  const { t, tList, pref, setPref, locale } = useI18n();
+  const { t, tList } = useI18n();
   const navigate = useNavigate();
   const regionOptions = [
     { value: 'US', label: t('region.us') },
@@ -48,25 +68,11 @@ function Header() {
             <Link to="/account?tab=wallet">{t('nav.wallet')}</Link>
           </nav>
           <div className="header-right">
-            <StatusClock compact />
             <Link to="/cart" className="cart-btn" title={t('tabbar.cart')}>
               🛒
               {cart.length > 0 && <span className="cart-badge">{cart.length}</span>}
             </Link>
             <ThemePicker />
-            {/* 语言：自动=跟随 IP/地区，可手动锁定 */}
-            <select
-              className="region-select lang-select"
-              value={pref}
-              onChange={(e) => setPref(e.target.value as any)}
-              title="Language"
-            >
-              <option value="auto">
-                {t('lang.auto')}（{locale === 'zh' ? '中文' : 'EN'}）
-              </option>
-              <option value="zh">中文</option>
-              <option value="en">English</option>
-            </select>
             <select
               className="region-select"
               value={region}
@@ -190,6 +196,7 @@ export default function App() {
       <BootSplash />
       <Cursor />
       <ScrollToTop />
+      <LocalePath />
       <Header />
       <main className="container main">
         <div className="page-enter" key={location.pathname}>

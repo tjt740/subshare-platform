@@ -133,6 +133,38 @@ export const THEMES = [
   { id: 'coffee', name: '复古咖啡', desc: '温暖 · 复古 · 焦糖', dots: ['#a0522d', '#d4a373', '#efe6da'] },
 ];
 
+/* ============ 表盘时钟（24h 语义下的模拟表盘，本地时区） ============ */
+export function AnalogClock({ size = 66 }: { size?: number }) {
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const s = now.getSeconds();
+  const m = now.getMinutes();
+  const h = now.getHours() % 12;
+  const sd = s * 6;
+  const md = m * 6 + s * 0.1;
+  const hd = h * 30 + m * 0.5;
+  return (
+    <svg viewBox="0 0 100 100" width={size} height={size} className="aclock" aria-hidden>
+      <circle cx="50" cy="50" r="46" className="ac-face" />
+      {Array.from({ length: 12 }).map((_, i) => (
+        <line
+          key={i}
+          x1="50" y1="8" x2="50" y2={i % 3 === 0 ? 17 : 12.5}
+          className={`ac-tick ${i % 3 === 0 ? 'big' : ''}`}
+          transform={`rotate(${i * 30} 50 50)`}
+        />
+      ))}
+      <line x1="50" y1="50" x2="50" y2="27" className="ac-hand hour" transform={`rotate(${hd} 50 50)`} />
+      <line x1="50" y1="50" x2="50" y2="17" className="ac-hand min" transform={`rotate(${md} 50 50)`} />
+      <line x1="50" y1="56" x2="50" y2="13" className="ac-hand sec" transform={`rotate(${sd} 50 50)`} />
+      <circle cx="50" cy="50" r="3.4" className="ac-dot" />
+    </svg>
+  );
+}
+
 /* ============ 运行状态时钟（本地时区 + API 心跳 + 运行时长） ============ */
 export function StatusClock({ compact = false }: { compact?: boolean }) {
   const { t, locale } = useI18n();
@@ -191,13 +223,16 @@ export function StatusClock({ compact = false }: { compact?: boolean }) {
   }
   return (
     <div className="status-strip">
-      <span>
-        <i className={`status-dot ${ok ? '' : 'bad'}`} />
-        {t(ok ? 'status.ok' : 'status.degraded')}
-      </span>
-      <span>🕐 {timeStr}</span>
-      <span>🌍 {t('status.tz')} {tz}</span>
-      <span>⏱ {t('status.uptime', { t: fmtUp(up) })}</span>
+      <AnalogClock />
+      <div className="status-lines">
+        <span>
+          <i className={`status-dot ${ok ? '' : 'bad'}`} />
+          {t(ok ? 'status.ok' : 'status.degraded')}
+        </span>
+        <span>
+          🕐 {timeStr} · 🌍 {tz} · ⏱ {t('status.uptime', { t: fmtUp(up) })}
+        </span>
+      </div>
     </div>
   );
 }

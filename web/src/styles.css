@@ -241,7 +241,9 @@ body.has-cursor, body.has-cursor a, body.has-cursor button { cursor: none; }
   background: var(--paper); border-bottom: var(--bw) solid var(--ink);
   position: sticky; top: 0; z-index: 50; transition: background 0.4s ease;
 }
-.header-inner { display: flex; align-items: center; gap: 20px; height: 64px; }
+.header-inner { display: flex; align-items: center; gap: 18px; height: 64px; flex-wrap: nowrap; }
+.nav { flex-shrink: 0; }
+.nav a { white-space: nowrap; }
 .brand { font-family: var(--font-display); font-size: 21px; display: flex; align-items: center; gap: 10px; }
 .brand-mark {
   width: 34px; height: 34px; border-radius: 9px; background: var(--red); color: #fff;
@@ -253,7 +255,11 @@ body.has-cursor, body.has-cursor a, body.has-cursor button { cursor: none; }
 .nav { display: flex; gap: 4px; font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; }
 .nav a { padding: 6px 12px; border-radius: 999px; border: var(--bw) solid transparent; transition: all 0.22s var(--ease); }
 .nav a:hover { border-color: var(--ink); background: var(--yellow); box-shadow: var(--sh-sm); transform: translateY(-1px); }
-.header-right { margin-left: auto; display: flex; align-items: center; gap: 9px; }
+.header-right { margin-left: auto; display: flex; align-items: center; gap: 9px; flex-wrap: nowrap; }
+.header-right .user-email { white-space: nowrap; max-width: 180px; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 1080px) {
+  .header-right .user-email { display: none; }
+}
 .region-select {
   border: var(--bw) solid var(--ink); border-radius: 999px; padding: 6px 12px; font-size: 13px;
   font-weight: 700; background: var(--card); color: var(--ink); cursor: pointer; box-shadow: var(--sh-sm);
@@ -863,12 +869,23 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
 }
 .clock-chip.bad { border-color: #f87171; color: #f87171; }
 .status-strip {
-  display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center;
+  display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center;
   border-top: 1px solid color-mix(in srgb, var(--inv-fg) 18%, transparent);
-  padding: 13px 0; font-size: 12.5px; font-weight: 700;
+  padding: 15px 0; font-size: 12.5px; font-weight: 700;
   color: color-mix(in srgb, var(--inv-fg) 78%, transparent);
   font-variant-numeric: tabular-nums;
 }
+.status-lines { display: grid; gap: 4px; }
+/* 表盘时钟 */
+.aclock { flex-shrink: 0; filter: drop-shadow(2px 2px 0 rgba(0, 0, 0, 0.25)); }
+.ac-face { fill: var(--card); stroke: var(--ink); stroke-width: 3; }
+.ac-tick { stroke: var(--muted); stroke-width: 2; stroke-linecap: round; }
+.ac-tick.big { stroke: var(--ink); stroke-width: 3; }
+.ac-hand { stroke: var(--ink); stroke-linecap: round; }
+.ac-hand.hour { stroke-width: 5; }
+.ac-hand.min { stroke-width: 3.4; }
+.ac-hand.sec { stroke: var(--red); stroke-width: 1.6; transition: transform 0.2s cubic-bezier(0.4, 2.2, 0.6, 1); }
+.ac-dot { fill: var(--red); stroke: var(--ink); stroke-width: 1.5; }
 
 /* ============ 购物车 ============ */
 .cart-btn {
