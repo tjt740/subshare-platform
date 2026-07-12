@@ -13,7 +13,9 @@ export interface Profile {
   email: string;
   nickname?: string;
   avatar?: string;
+  avatarFrame?: string;
   level?: number;
+  levels?: { lv: number; need: number }[];
   growthUsd?: number;
   nextLevelAt?: number | null;
   role: string;

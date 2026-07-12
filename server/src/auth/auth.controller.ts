@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Patch, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import { Request } from 'express';
 import {
   IsEmail,
   IsOptional,
@@ -32,8 +33,12 @@ class UpdateProfileDto {
   nickname?: string;
   @IsOptional()
   @IsString()
-  @MaxLength(8)
+  @MaxLength(300000) // 支持 base64 上传头像
   avatar?: string;
+  @IsOptional()
+  @IsString()
+  @MaxLength(16)
+  avatarFrame?: string;
 }
 
 class ChangePasswordDto {
@@ -61,8 +66,36 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() dto: LoginDto) {
-    return this.auth.login(dto.email, dto.password);
+  login(@Body() dto: LoginDto, @Req() req: Request) {
+    const ip =
+      ((req.headers['x-forwarded-for'] as string) || '').split(',')[0].trim() ||
+      req.socket.remoteAddress ||
+      '';
+    return this.auth.login(
+      dto.email,
+      dto.password,
+      ip,
+      (req.headers['user-agent'] as string) || '',
+    );
+  }
+
+  /** 忘记密码：申请重置令牌 */
+  @Post('forgot-password')
+  forgot(@Body() body: { email: string }) {
+    return this.auth.forgotPassword(body?.email || '');
+  }
+
+  /** 用令牌重置密码 */
+  @Post('reset-password')
+  reset(@Body() body: { token: string; newPassword: string }) {
+    return this.auth.resetPassword(body?.token || '', body?.newPassword || '');
+  }
+
+  /** 我的登录记录（账户安全） */
+  @Get('login-history')
+  @UseGuards(JwtAuthGuard)
+  loginHistory(@CurrentUser() user: JwtUser) {
+    return this.auth.loginHistory(user.sub);
   }
 
   @Get('me')

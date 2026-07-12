@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Link,
   Route,
@@ -16,6 +16,9 @@ import Cart from './pages/Cart';
 import { LoginPage, RegisterPage } from './pages/AuthPages';
 import Pay from './pages/Pay';
 import Account from './pages/Account';
+import Legal from './pages/Legal';
+import Forgot from './pages/Forgot';
+import Avatar from './components/Avatar';
 import SupportWidget from './components/SupportWidget';
 import {
   BootSplash,
@@ -51,6 +54,7 @@ function Header() {
   const { user, region, setRegion, logout, cart, siteCfg } = useApp();
   const { t, tList } = useI18n();
   const navigate = useNavigate();
+  const [menuOpen, setMenuOpen] = useState(false);
   const regionOptions = [
     { value: 'US', label: t('region.us') },
     { value: 'EU', label: t('region.eu') },
@@ -58,67 +62,132 @@ function Header() {
   ];
   return (
     <>
-      <Marquee items={Array.isArray(siteCfg?.announce) && siteCfg.announce.length ? siteCfg.announce : tList('announce.items')} className="announce" />
+      <Marquee
+        items={
+          Array.isArray(siteCfg?.announce) && siteCfg.announce.length
+            ? siteCfg.announce
+            : tList('announce.items')
+        }
+        className="announce"
+      />
       <header className="site-header">
         <div className="container header-inner">
-          <Link to="/" className="brand">
-            <span className="brand-mark">S</span> SubShare
+          <Link to="/" className="brand" aria-label="SubShare 首页">
+            <span className="brand-mark" aria-hidden>S</span> SubShare
           </Link>
-          <nav className="nav">
+          <nav className="nav" aria-label="主导航">
             <Link to="/">{t('nav.products')}</Link>
             <Link to="/account">{t('nav.subs')}</Link>
             <Link to="/account?tab=wallet">{t('nav.wallet')}</Link>
           </nav>
           <div className="header-right">
-            <Link to="/cart" className="cart-btn" title={t('tabbar.cart')}>
-              🛒
+            <Link to="/cart" className="cart-btn" aria-label={`${t('tabbar.cart')}（${cart.length}）`}>
+              <span aria-hidden>🛒</span>
               {cart.length > 0 && <span className="cart-badge">{cart.length}</span>}
             </Link>
-            <ThemePicker />
+            {/* 桌面端完整控件 */}
+            <span className="desk-only"><ThemePicker /></span>
             <select
-              className="region-select"
+              className="region-select desk-only"
               value={region}
+              aria-label="选择地区与币种"
               onChange={(e) => setRegion(e.target.value)}
             >
               {regionOptions.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
+                <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
             {user ? (
-              <div className="user-chip">
+              <>
                 <span
-                  className="balance-pill"
+                  className="balance-pill desk-only"
+                  role="button"
+                  tabIndex={0}
                   onClick={() => navigate('/account?tab=wallet')}
+                  onKeyDown={(e) => e.key === 'Enter' && navigate('/account?tab=wallet')}
                 >
                   💰 ${user.balance.toFixed(2)}
                 </span>
-                <span
+                {/* 用户入口（移动端也保留） */}
+                <button
                   className={`user-email lv-name lv${user.level ?? 1}`}
+                  aria-label="个人中心"
                   onClick={() => navigate('/account?tab=profile')}
                 >
-                  <i className={`lv-ring lv${user.level ?? 1}`}>{user.avatar ?? '😀'}</i>
-                  {user.nickname || user.email}
+                  <Avatar value={user.avatar} frame={user.avatarFrame} size={30} className={`lv${user.level ?? 1}`} />
+                  <span className="uname desk-only">{user.nickname || user.email}</span>
                   <b className={`lv-badge lv${user.level ?? 1}`}>LV{user.level ?? 1}</b>
-                </span>
-                <button className="btn btn-ghost btn-sm" onClick={logout}>
+                </button>
+                <button className="btn btn-ghost btn-sm desk-only" onClick={logout}>
                   {t('auth.logout')}
                 </button>
-              </div>
+              </>
             ) : (
-              <div className="auth-buttons">
-                <Link className="btn btn-ghost btn-sm" to="/login">
-                  {t('auth.login')}
-                </Link>
-                <Link className="btn btn-primary btn-sm" to="/register">
-                  {t('auth.register')}
-                </Link>
+              <div className="auth-buttons desk-only">
+                <Link className="btn btn-ghost btn-sm" to="/login">{t('auth.login')}</Link>
+                <Link className="btn btn-primary btn-sm" to="/register">{t('auth.register')}</Link>
               </div>
             )}
+            {/* 移动端菜单按钮 */}
+            <button
+              className="menu-btn mob-only"
+              aria-label={t('nav.menu')}
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((o) => !o)}
+            >
+              ☰
+            </button>
           </div>
         </div>
       </header>
+
+      {/* 移动端菜单抽屉：地区/主题/登录退出/条款 */}
+      {menuOpen && (
+        <>
+          <div className="menu-mask" onClick={() => setMenuOpen(false)} />
+          <div className="menu-sheet" role="dialog" aria-label={t('nav.menu')}>
+            <div className="ms-row">
+              <span>地区 / 币种</span>
+              <select
+                className="region-select"
+                value={region}
+                aria-label="选择地区与币种"
+                onChange={(e) => setRegion(e.target.value)}
+              >
+                {regionOptions.map((r) => (
+                  <option key={r.value} value={r.value}>{r.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="ms-row">
+              <span>界面主题</span>
+              <ThemePicker />
+            </div>
+            {user ? (
+              <>
+                <div className="ms-row">
+                  <span>钱包余额</span>
+                  <b>${user.balance.toFixed(2)}</b>
+                </div>
+                <button className="btn btn-ghost btn-block" onClick={() => { setMenuOpen(false); logout(); }}>
+                  {t('auth.logout')}
+                </button>
+              </>
+            ) : (
+              <div className="ms-actions">
+                <Link className="btn btn-ghost" to="/login" onClick={() => setMenuOpen(false)}>{t('auth.login')}</Link>
+                <Link className="btn btn-primary" to="/register" onClick={() => setMenuOpen(false)}>{t('auth.register')}</Link>
+              </div>
+            )}
+            <div className="ms-legal">
+              <Link to="/legal/terms" onClick={() => setMenuOpen(false)}>{t('legal.terms')}</Link>
+              <Link to="/legal/privacy" onClick={() => setMenuOpen(false)}>{t('legal.privacy')}</Link>
+              <Link to="/legal/refund" onClick={() => setMenuOpen(false)}>{t('legal.refund')}</Link>
+              <Link to="/legal/about" onClick={() => setMenuOpen(false)}>{t('legal.about')}</Link>
+            </div>
+          </div>
+        </>
+      )}
     </>
   );
 }
@@ -176,6 +245,13 @@ function Footer() {
           <Link to="/account?tab=wallet">{t('footer.recharge')}</Link>
         </div>
         <div>
+          <h4>条款与政策</h4>
+          <Link to="/legal/terms">{t('legal.terms')}</Link>
+          <Link to="/legal/privacy">{t('legal.privacy')}</Link>
+          <Link to="/legal/refund">{t('legal.refund')}</Link>
+          <Link to="/legal/about">{t('legal.about')}</Link>
+        </div>
+        <div>
           <h4>{t('footer.guarantee')}</h4>
           <p>{sc(f.g1, t('footer.g1'))}</p>
           <p>{sc(f.g2, t('footer.g2'))}</p>
@@ -218,6 +294,8 @@ export default function App() {
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/pay/:paymentId" element={<Pay />} />
             <Route path="/account" element={<Account />} />
+            <Route path="/forgot" element={<Forgot />} />
+            <Route path="/legal/:kind" element={<Legal />} />
           </Routes>
         </div>
       </main>

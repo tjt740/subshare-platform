@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../store';
+import { useI18n } from '../i18n';
 
 function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const { login, register } = useApp();
+  const { t: t2 } = useI18n();
+  const [showPwd, setShowPwd] = useState(false);
   const navigate = useNavigate();
   const location = useLocation() as { state?: { from?: string } };
   const [email, setEmail] = useState('');
@@ -52,14 +55,30 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
         </label>
         <label className="field">
           <span>密码</span>
-          <input
-            type="password"
-            required
-            minLength={6}
-            placeholder="至少 6 位"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+          <div className="pwd-wrap">
+            <input
+              type={showPwd ? 'text' : 'password'}
+              required
+              minLength={6}
+              autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+              placeholder="至少 6 位"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="pwd-toggle"
+              aria-label={showPwd ? '隐藏密码' : '显示密码'}
+              onClick={() => setShowPwd((s) => !s)}
+            >
+              {showPwd ? '🙈' : '👁'}
+            </button>
+          </div>
+          {mode === 'register' && password.length > 0 && (
+            <span className={`pwd-strength s${password.length >= 12 ? 3 : password.length >= 8 ? 2 : 1}`}>
+              强度：{password.length >= 12 ? '强' : password.length >= 8 ? '中' : '弱'}
+            </span>
+          )}
         </label>
         {mode === 'register' && (
           <label className="field">
@@ -74,7 +93,7 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
             />
           </label>
         )}
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && <div className="alert alert-error" role="alert">{error}</div>}
         <button
           className="btn btn-primary btn-lg btn-block"
           disabled={submitting}
@@ -82,6 +101,11 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           {submitting ? '请稍候…' : mode === 'login' ? '登录' : '注册并登录'}
         </button>
       </form>
+      {mode === 'login' && (
+        <p className="auth-switch">
+          <Link to="/forgot">{t2('auth.forgot')}</Link>
+        </p>
+      )}
       <p className="auth-switch">
         {mode === 'login' ? (
           <>
@@ -93,7 +117,7 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           </>
         )}
       </p>
-      <p className="tiny-note">演示账号：user@demo.com / User123!</p>
+
     </div>
   );
 }

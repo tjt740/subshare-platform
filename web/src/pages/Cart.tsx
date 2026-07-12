@@ -83,9 +83,7 @@ export default function Cart() {
                   <div className="card-logo">{CATEGORY_ICON[c.category] ?? '📦'}</div>
                   <div className="ci-info">
                     <b>{c.productTitle}</b>
-                    <span className="muted small">
-                      {c.planName} · {t('checkout.months', { n: c.periodMonths })}
-                    </span>
+                    <span className="muted small">{c.planName}</span>
                     {q && !q.available && (
                       <span className="badge badge-canceled">{q.reason}</span>
                     )}
@@ -136,6 +134,11 @@ export default function Cart() {
             >
               {t('cart.checkout', { n: buyable.length })}
             </button>
+            {!token && (
+              <p className="tiny-note" style={{ marginTop: 8 }}>
+                🔒 {t('auth.loginNote')}
+              </p>
+            )}
             <div className="guarantee">
               <span>{t('detail.g1')}</span>
               <span>{t('detail.g2')}</span>

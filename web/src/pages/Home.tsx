@@ -49,6 +49,8 @@ export default function Home() {
   const [error, setError] = useState('');
   const [cat, setCat] = useState('__all__');
   const [keyword, setKeyword] = useState('');
+  const [sort, setSort] = useState('default');
+  const [inStockOnly, setInStockOnly] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -62,23 +64,29 @@ export default function Home() {
     () => ['__all__', ...Array.from(new Set(products.map((p) => p.category)))],
     [products],
   );
-  const filtered = products.filter(
-    (p) =>
-      (cat === '__all__' || p.category === cat) &&
-      (keyword === '' ||
-        p.title.toLowerCase().includes(keyword.toLowerCase()) ||
-        p.description.includes(keyword)),
-  );
+  const filtered = products
+    .filter(
+      (p) =>
+        (cat === '__all__' || p.category === cat) &&
+        (!inStockOnly || p.totalStock > 0) &&
+        (keyword === '' ||
+          p.title.toLowerCase().includes(keyword.toLowerCase()) ||
+          p.description.includes(keyword)),
+    )
+    .sort((a, b) => {
+      if (sort === 'sales') return b.soldCount - a.soldCount;
+      if (sort === 'priceAsc') return toUsd(a.fromPrice, a.currency) - toUsd(b.fromPrice, b.currency);
+      if (sort === 'priceDesc') return toUsd(b.fromPrice, b.currency) - toUsd(a.fromPrice, a.currency);
+      return 0;
+    });
+  const hot = [...products].sort((a, b) => b.soldCount - a.soldCount).slice(0, 3);
 
   return (
     <div>
       <section className="hero">
-        <div className="hero-emojis">
-          <span style={{ right: '22%', top: '58%', ['--r' as any]: '8deg' }}>🎬</span>
-          <span style={{ right: '10%', top: '66%', animationDelay: '0.8s', ['--r' as any]: '-10deg' }}>🎵</span>
-          <span style={{ right: '30%', top: '20%', animationDelay: '1.6s', ['--r' as any]: '6deg' }}>🤖</span>
+        <div className="hero-emojis" aria-hidden>
+          <span style={{ right: '8%', top: '22%', ['--r' as any]: '6deg' }}>🎬</span>
         </div>
-        <div className="spin-badge">{sc(hero.badge, t('hero.badge'))}</div>
         <span className="eyebrow">{t('hero.eyebrow')}</span>
         <h1>
           {sc(hero.t1, t('hero.t1'))}
@@ -89,6 +97,9 @@ export default function Home() {
           <span className="red">.</span>
         </h1>
         <p>{sc(hero.p, t('hero.p'))}</p>
+        <a className="btn btn-primary btn-lg hero-cta" href="#catalog">
+          {t('catalog.heading')} →
+        </a>
       </section>
 
       <Marquee className="strip" items={tList('strip.items')} />
@@ -102,7 +113,7 @@ export default function Home() {
         </div>
       </Reveal>
 
-      <div className="section-eyebrow">{t('catalog.eyebrow')}</div>
+      <div className="section-eyebrow" id="catalog">{t('catalog.eyebrow')}</div>
       <h2 className="section-heading">{t('catalog.heading')}</h2>
 
       <div className="catalog-tools">
@@ -117,12 +128,33 @@ export default function Home() {
             </button>
           ))}
         </div>
-        <input
-          className="search-input"
-          placeholder={t('catalog.searchPh')}
-          value={keyword}
-          onChange={(e) => setKeyword(e.target.value)}
-        />
+        <div className="tool-right">
+          <select
+            className="region-select"
+            aria-label="排序方式"
+            value={sort}
+            onChange={(e) => setSort(e.target.value)}
+          >
+            <option value="default">{t('sort.default')}</option>
+            <option value="sales">{t('sort.sales')}</option>
+            <option value="priceAsc">{t('sort.priceAsc')}</option>
+            <option value="priceDesc">{t('sort.priceDesc')}</option>
+          </select>
+          <button
+            className={`cat-chip ${inStockOnly ? 'active' : ''}`}
+            aria-pressed={inStockOnly}
+            onClick={() => setInStockOnly((v) => !v)}
+          >
+            {t('sort.stock')}
+          </button>
+          <input
+            className="search-input"
+            aria-label={t('catalog.searchPh')}
+            placeholder={t('catalog.searchPh')}
+            value={keyword}
+            onChange={(e) => setKeyword(e.target.value)}
+          />
+        </div>
       </div>
 
       {error && <div className="alert alert-error">{error}</div>}
@@ -192,7 +224,17 @@ export default function Home() {
       )}
 
       {!loading && filtered.length === 0 && !error && (
-        <div className="empty">{t('catalog.empty')}</div>
+        <div className="empty">
+          <p>{t('catalog.empty')}</p>
+          <p className="muted small" style={{ marginTop: 10 }}>{t('catalog.hot')}</p>
+          <div className="hot-links">
+            {hot.map((p) => (
+              <Link key={p.id} className="btn btn-ghost btn-sm" to={`/p/${p.slug}`}>
+                {CATEGORY_ICON[p.category] ?? '📦'} {p.title}
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
     </div>
   );

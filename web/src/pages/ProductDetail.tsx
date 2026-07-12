@@ -87,11 +87,18 @@ export default function ProductDetail() {
 
   if (!detail) {
     return error ? (
-      <div className="alert alert-error">{error}</div>
+      <div className="alert alert-error" role="alert">{error}</div>
     ) : (
-      <div>
-        <div className="skeleton" style={{ height: 130, marginBottom: 18 }} />
-        <div className="skeleton" style={{ height: 320 }} />
+      // 商品详情骨架屏（避免异步加载期间的空白主体）
+      <div className="detail" aria-busy="true">
+        <div>
+          <div className="skeleton" style={{ height: 130, marginBottom: 20 }} />
+          <div className="skeleton" style={{ height: 18, width: '80%', marginBottom: 10 }} />
+          <div className="skeleton" style={{ height: 18, width: '60%', marginBottom: 24 }} />
+          <div className="skeleton" style={{ height: 120, marginBottom: 14 }} />
+          <div className="skeleton" style={{ height: 120 }} />
+        </div>
+        <div className="skeleton" style={{ height: 340 }} />
       </div>
     );
   }
@@ -289,6 +296,17 @@ export default function ProductDetail() {
           >
             {added ? t('detail.added') : inCart ? t('detail.inCart') : t('detail.addCart')}
           </button>
+          <details className="price-note">
+            <summary>ℹ️ {t('price.title')}</summary>
+            <ul>
+              <li>{t('price.fx')}</li>
+              <li>{t('price.renew')}</li>
+              <li>{t('price.noauto')}</li>
+              <li>
+                {t('price.refund')} <Link to="/legal/refund">《{t('legal.refund')}》</Link>
+              </li>
+            </ul>
+          </details>
           <div className="guarantee">
             <span>{t('detail.g1')}</span>
             <span>{t('detail.g2')}</span>

@@ -26,12 +26,13 @@ const PROVIDER_LABEL: Record<string, string> = {
 /** Mock 收银台 */
 export default function Pay() {
   const { paymentId } = useParams();
-  const { token, refreshUser } = useApp();
+  const { token, user, refreshUser } = useApp();
   const { t } = useI18n();
   const navigate = useNavigate();
   const [payment, setPayment] = useState<PaymentView | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [levelUp, setLevelUp] = useState<{ from: number; to: number } | null>(null);
 
   useEffect(() => {
     if (!token) {
@@ -57,6 +58,12 @@ export default function Pay() {
         status: result.paymentStatus as PaymentView['status'],
         orderStatus: result.orderStatus,
       });
+      // 成长值/等级变化提示（充值与消费都会累计成长值）
+      const before = user?.level ?? 1;
+      const fresh = await api<{ level: number }>('/auth/me', { token });
+      if (success && fresh.level > before) {
+        setLevelUp({ from: before, to: fresh.level });
+      }
       refreshUser();
     } catch (e: any) {
       setError(e.message);
@@ -167,6 +174,11 @@ export default function Pay() {
                   ? t('pay.delivered')
                   : t('pay.queued')}
             </p>
+            {levelUp && (
+              <div className="alert alert-ok" style={{ textAlign: 'center' }}>
+                {t('level.up')} LV{levelUp.from} → <b>LV{levelUp.to} {t(`lv.${levelUp.to}`)}</b>
+              </div>
+            )}
             <Link
               className="btn btn-primary btn-lg"
               to={isRecharge ? '/account?tab=wallet' : '/account'}

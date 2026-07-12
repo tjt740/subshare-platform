@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import { api, CATEGORY_ICON, money, PROVIDERS, toUsd } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
@@ -217,15 +217,17 @@ export default function Checkout() {
           ))}
         </div>
         {!balanceEnough && (
-          <p className="tiny-note">
-            {t('checkout.needMore')}
-            <a
-              style={{ color: 'var(--red)', fontWeight: 800, cursor: 'pointer' }}
+          <div className="topup-hint">
+            <span>{t('checkout.needMore')}</span>
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
               onClick={() => navigate('/account?tab=wallet')}
             >
-              {t('checkout.goRecharge')}
-            </a>
-          </p>
+              💰 {t('checkout.goRecharge')}
+            </button>
+            <span className="muted small">或直接选择上方银行卡 / 支付宝支付</span>
+          </div>
         )}
       </div>
 
@@ -240,7 +242,17 @@ export default function Checkout() {
           ? t('checkout.creating')
           : t('checkout.submit', { amt: money(total, currency) })}
       </button>
-      <p className="tiny-note">{t('checkout.agree')}</p>
+      <p className="tiny-note terms-note">
+        {t('checkout.agree2')}{' '}
+        <Link to="/legal/terms">《{t('legal.terms')}》</Link>{' '}
+        {t('checkout.and')}{' '}
+        <Link to="/legal/refund">《{t('legal.refund')}》</Link>
+        {' · '}
+        <Link to="/legal/privacy">《{t('legal.privacy')}》</Link>
+      </p>
+      <div className="pay-safety">
+        🔒 支付由第三方支付机构托管，平台不存储你的卡号与密码 · 全站 HTTPS 加密
+      </div>
     </div>
   );
 }

@@ -22,7 +22,10 @@ export class User {
   email: string;
   @Column({ type: 'text' }) passwordHash: string;
   @Column({ type: 'text', default: '' }) nickname: string;
-  @Column({ type: 'text', default: '😀' }) avatar: string;
+  /** 头像：预置 SVG 名(如 'sv:duck')、emoji、或 data:image base64（本地上传） */
+  @Column({ type: 'text', default: 'sv:spark' }) avatar: string;
+  /** 头像装饰框（仿 Notion AI）：none/gold/neon/leaf/crown… */
+  @Column({ type: 'text', default: 'none' }) avatarFrame: string;
   @Column({ type: 'text', default: 'user' })
   role: 'user' | 'admin' | 'super' | 'supplier';
   @Column({ type: 'text', default: '[]' }) permissions: string; // JSON string[]
@@ -32,6 +35,21 @@ export class User {
   @Column({ type: 'real', default: 0 }) growthUsd: number;
   /** 等级人工覆盖（后台设置；null=按成长值自动计算） */
   @Column({ type: 'integer', nullable: true }) levelOverride: number | null;
+  /** 密码重置令牌（演示：接口直接返回；生产走邮件） */
+  @Column({ type: 'text', nullable: true }) resetToken: string | null;
+  @Column({ type: 'datetime', nullable: true }) resetExpires: Date | null;
+  @CreateDateColumn() createdAt: Date;
+}
+
+/** 登录记录（账户安全：设备/IP/时间，异常登录可查） */
+@Entity('login_logs')
+export class LoginLog {
+  @PrimaryGeneratedColumn() id: number;
+  @Index()
+  @Column({ type: 'integer' })
+  userId: number;
+  @Column({ type: 'text', default: '' }) ip: string;
+  @Column({ type: 'text', default: '' }) userAgent: string;
   @CreateDateColumn() createdAt: Date;
 }
 
@@ -265,6 +283,7 @@ export const ALL_ENTITIES = [
   TicketMessage,
   SupplierSubmission,
   SiteSetting,
+  LoginLog,
 ];
 
 export const REGIONS = ['US', 'EU', 'CN', 'GLOBAL'] as const;

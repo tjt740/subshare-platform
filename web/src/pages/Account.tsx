@@ -10,6 +10,7 @@ import {
 } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
+import Avatar, { AVATAR_FRAMES, AVATAR_PRESETS } from '../components/Avatar';
 
 interface SubView {
   id: number;
@@ -80,7 +81,7 @@ const TXN_TYPE: Record<string, string> = {
   refund: '退款',
 };
 const RECHARGE_AMOUNTS = [10, 25, 50, 100];
-const AVATARS = ['😀','😎','🦊','🐱','🐻','🐼','🦄','👾','🤖','🍊','⚡','🌈'];
+
 
 function CredentialRow({ label, value }: { label: string; value?: string }) {
   const [copied, setCopied] = useState(false);
@@ -152,7 +153,9 @@ export default function Account() {
   const [recharging, setRecharging] = useState(false);
   // 个人资料
   const [nickname, setNickname] = useState('');
-  const [avatar, setAvatar] = useState('😀');
+  const [avatar, setAvatar] = useState('sv:spark');
+  const [avatarFrame, setAvatarFrame] = useState('none');
+  const [loginLogs, setLoginLogs] = useState<any[]>([]);
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMsg, setProfileMsg] = useState('');
   const [oldPwd, setOldPwd] = useState('');
@@ -164,9 +167,33 @@ export default function Account() {
   useEffect(() => {
     if (user) {
       setNickname(user.nickname ?? '');
-      setAvatar(user.avatar ?? '😀');
+      setAvatar(user.avatar ?? 'sv:spark');
+      setAvatarFrame(user.avatarFrame ?? 'none');
     }
   }, [user]);
+
+  // 账户安全：登录记录
+  useEffect(() => {
+    if (tab === 'profile' && token) {
+      api<any[]>('/auth/login-history', { token })
+        .then(setLoginLogs)
+        .catch(() => undefined);
+      refreshUser();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, token]);
+
+  function onUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 200 * 1024) {
+      setError('图片过大，请压缩到 200KB 以内');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setAvatar(String(reader.result));
+    reader.readAsDataURL(file);
+  }
 
   const load = useCallback(() => {
     if (!token) return;
@@ -232,7 +259,7 @@ export default function Account() {
       await api('/auth/profile', {
         method: 'PATCH',
         token,
-        body: JSON.stringify({ nickname, avatar }),
+        body: JSON.stringify({ nickname, avatar, avatarFrame }),
       });
       refreshUser();
       setProfileMsg(t('profile.saved'));
@@ -590,7 +617,7 @@ export default function Account() {
           <div className={`panel level-card lv${user.level ?? 1}`}>
             <h3>{t('profile.levelTitle')}</h3>
             <div className="level-head">
-              <i className={`lv-ring big lv${user.level ?? 1}`}>{user.avatar ?? '😀'}</i>
+              <Avatar value={user.avatar} frame={user.avatarFrame} size={56} className={`lv${user.level ?? 1}`} />
               <div>
                 <b className={`lv-name lv${user.level ?? 1}`} style={{ fontSize: 18 }}>
                   {t(`lv.${user.level ?? 1}`)}
@@ -627,21 +654,65 @@ export default function Account() {
                 />
               </div>
             </div>
+            {/* 等级阈值表（让升级规则可见） */}
+            <div className="lv-table">
+              <div className="muted small" style={{ marginBottom: 6 }}>{t('profile.levelTable')}</div>
+              {(user.levels ?? [
+                { lv: 1, need: 0 }, { lv: 2, need: 50 }, { lv: 3, need: 150 },
+                { lv: 4, need: 400 }, { lv: 5, need: 1000 },
+              ]).map((L) => (
+                <div key={L.lv} className={`lv-row ${(user.level ?? 1) >= L.lv ? 'reached' : ''}`}>
+                  <b className={`lv-badge lv${L.lv}`}>LV{L.lv}</b>
+                  <span>{t(`lv.${L.lv}`)}</span>
+                  <span className="muted small">成长值 ≥ ${L.need}</span>
+                  {(user.level ?? 1) >= L.lv && <span className="lv-ok">✓</span>}
+                </div>
+              ))}
+            </div>
           </div>
           <div className="panel">
             <h3>{t('profile.title')}</h3>
-            <label className="field">
+            <div className="avatar-editor">
+              <Avatar value={avatar} frame={avatarFrame} size={96} />
+              <div className="ae-side">
+                <label className="btn btn-ghost btn-sm upload-btn">
+                  📤 {t('profile.upload')}
+                  <input type="file" accept="image/*" onChange={onUpload} hidden />
+                </label>
+                <span className="muted small">{t('profile.uploadHint')}</span>
+              </div>
+            </div>
+            <label className="field" style={{ marginTop: 12 }}>
               <span>{t('profile.avatar')}</span>
             </label>
             <div className="avatar-grid">
-              {AVATARS.map((a) => (
+              {AVATAR_PRESETS.map((a) => (
                 <button
                   type="button"
-                  key={a}
-                  className={`avatar-chip ${avatar === a ? 'active' : ''}`}
-                  onClick={() => setAvatar(a)}
+                  key={a.id}
+                  className={`avatar-chip ${avatar === a.id ? 'active' : ''}`}
+                  aria-label={a.id}
+                  aria-pressed={avatar === a.id}
+                  onClick={() => setAvatar(a.id)}
                 >
-                  {a}
+                  <Avatar value={a.id} size={30} />
+                </button>
+              ))}
+            </div>
+            <label className="field" style={{ marginTop: 12 }}>
+              <span>{t('profile.frame')}</span>
+            </label>
+            <div className="avatar-grid">
+              {AVATAR_FRAMES.map((f) => (
+                <button
+                  type="button"
+                  key={f.id}
+                  className={`avatar-chip ${avatarFrame === f.id ? 'active' : ''}`}
+                  aria-label={f.name}
+                  aria-pressed={avatarFrame === f.id}
+                  onClick={() => setAvatarFrame(f.id)}
+                >
+                  <Avatar value={avatar} frame={f.id} size={30} />
                 </button>
               ))}
             </div>
@@ -693,6 +764,38 @@ export default function Account() {
             >
               {t('profile.pwdBtn')}
             </button>
+          </div>
+
+          <div className="panel">
+            <h3>🔐 {t('profile.security')} · {t('profile.loginHistory')}</h3>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>IP</th>
+                    <th>设备</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {loginLogs.map((l) => (
+                    <tr key={l.id}>
+                      <td className="small">{fmtTime(l.createdAt)}</td>
+                      <td className="mono small">{l.ip || '-'}</td>
+                      <td className="muted small" style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {(l.userAgent || '-').slice(0, 60)}
+                      </td>
+                    </tr>
+                  ))}
+                  {loginLogs.length === 0 && (
+                    <tr><td colSpan={3} className="empty">暂无登录记录</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            <p className="tiny-note" style={{ textAlign: 'left' }}>
+              若发现陌生登录，请立即修改密码并提交工单。
+            </p>
           </div>
         </div>
       )}
