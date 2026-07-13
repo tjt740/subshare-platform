@@ -1561,3 +1561,76 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
   .brand-name { max-width: 34vw; }
   .container { padding: 0 10px; }
 }
+
+/* ============================================================
+ * 平板 / 折叠屏（641–1024px）顶栏溢出修复
+ *
+ * 根因：.desk-only 只在 ≤640px 才收起。641–1024px 的平板与折叠屏上，
+ * 顶栏一行要塞下：品牌 + 主导航(3项) + 购物车 + 主题 + 地区下拉 + 登录 + 注册，
+ * 而 .header-inner 是 flex-wrap:nowrap、按钮又是 white-space:nowrap →
+ * 这一行必然宽于视口，把整个文档撑宽。
+ *
+ * 它同时制造了两个看似无关的现象：
+ *  1) 向右滑动，右边露出一大片空白（文档比视口宽）
+ *  2) 弹窗「不居中」—— 因为文档一旦横向溢出，浏览器的布局视口就比可视视口宽，
+ *     而 position:fixed 是相对布局视口定位的，居中自然就偏了。
+ *
+ * 所以这里把主导航与桌面控件在 ≤1024px 收进汉堡抽屉（抽屉里本来就有
+ * 地区/主题/登录/注册/退出），顶栏永远只剩：品牌 + 铃铛 + 购物车 + 头像 + 汉堡。
+ * ============================================================ */
+@media (max-width: 1024px) {
+  .nav { display: none; }
+
+  /* 桌面态控件（主题、地区、余额、用户名、退出、登录/注册）统统进抽屉 */
+  .header-right .desk-only,
+  .header-right .region-select.desk-only,
+  .header-right .auth-buttons.desk-only { display: none !important; }
+
+  /* 汉堡按钮提前出现（它带 .mob-only，默认 ≤640 才显示） */
+  .menu-btn.mob-only { display: inline-flex !important; }
+
+  .header-inner { gap: 10px; }
+}
+
+/* ============ 新手引导：按钮不被挤到换行 ============
+ * 原来「下一步」是 .btn-block（width:100%），在 flex 行里把「上一步」压扁，
+ * 于是「上一步」被迫竖排成「上一/步」。改为：上一步按内容宽不收缩，主按钮吃掉剩余空间。 */
+.ob-actions { display: flex; gap: 10px; align-items: stretch; }
+.ob-actions .btn { min-width: 0; }
+.ob-actions .btn-ghost { flex: 0 0 auto; }        /* 上一步：按内容宽，绝不压扁 */
+.ob-actions .btn-block { width: auto; flex: 1 1 0; } /* 主按钮：占满剩余，而非强行 100% */
+
+/* 引导弹窗在矮屏/横屏下可滚动，不会顶出视口 */
+.ob-card { max-height: calc(100dvh - 40px); overflow-y: auto; }
+
+/* ============ 移动端底部留白按实际栏高给，避免大片空白 ============ */
+@media (max-width: 640px) {
+  /* 原来固定 170px，首页底部会空出一大块。底部导航栏约 56px + 安全区即可。 */
+  .main { padding-bottom: calc(84px + env(safe-area-inset-bottom)); }
+  /* 商品详情页底部还有「购买栏」，单独再加一层留白 */
+  .detail { padding-bottom: 72px; }
+}
+
+/* ============ 安全区（viewport-fit=cover 开启后必须自己避让刘海/手势条） ============ */
+.container {
+  padding-left: max(14px, env(safe-area-inset-left));
+  padding-right: max(14px, env(safe-area-inset-right));
+}
+@media (max-width: 640px) {
+  .container {
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+}
+/* 底部栏/购买栏/客服按钮在横屏时避开刘海侧 */
+.mobile-tabbar, .mobile-buybar {
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+}
+
+/* 顶栏收缩优先级：品牌名是唯一可以让步的元素（省略号），
+   图标按钮永不被压扁 —— 保证任何屏宽下顶栏都不会撑破视口。 */
+.header-inner .brand { flex: 0 1 auto; min-width: 0; overflow: hidden; }
+.header-inner .brand .brand-name { overflow: hidden; text-overflow: ellipsis; }
+.header-inner .brand .brand-mark { flex: 0 0 auto; }
+.header-right { flex: 0 0 auto; }
