@@ -697,7 +697,6 @@ body.has-cursor, body.has-cursor a, body.has-cursor button { cursor: none; }
   position: relative; overflow: hidden;
 }
 .wallet-hero::after {
-  content: '💰'; position: absolute; right: 22px; bottom: -14px; font-size: 96px; opacity: 0.3;
   transform: rotate(-8deg);
 }
 .wallet-hero .bal { font-family: var(--font-display); font-size: clamp(34px, 6vw, 46px); }
@@ -1009,7 +1008,7 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
   -webkit-background-clip: text; background-clip: text; color: transparent;
   animation: lvName 3s linear infinite;
 }
-.lv-name.lv5::after { content: '👑'; -webkit-text-fill-color: initial; margin-left: 3px; }
+/* LV5 皇冠改由 Avatar 组件的 SVG 装饰渲染，不再用 emoji 伪元素 */
 .lv-badge {
   font-size: 10px; font-weight: 900; padding: 1px 7px; border-radius: 999px;
   border: 1.5px solid currentColor; font-style: normal; line-height: 1.5;

@@ -617,7 +617,7 @@ export default function SupportWidget() {
                         onClick={() => setRating(star)}
                         aria-label={`${star} 星`}
                       >
-                        ★
+                        <Icon name="star" size={18} />
                       </button>
                     ))}
                   </div>

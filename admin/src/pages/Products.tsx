@@ -17,6 +17,10 @@ import {
   Tag,
   message,
 } from 'antd';
+import { AppstoreOutlined, CarOutlined, ClockCircleOutlined, CustomerServiceOutlined, EyeOutlined, LaptopOutlined, PlayCircleOutlined, ReadOutlined, RobotOutlined, SafetyCertificateOutlined, ThunderboltOutlined, TrophyOutlined } from '@ant-design/icons';
+
+/** 交付=卡车语义，AntD 用 CarOutlined */
+const TruckIcon = CarOutlined;
 import { api, CURRENCIES, REGIONS } from '../api';
 
 interface ProductRow {
@@ -38,8 +42,14 @@ const parseMeta = (m?: string) => {
   }
 };
 
-const CAT_ICON: Record<string, string> = {
-  流媒体: '▶', 音乐: '♪', 'AI 工具': '✦', 办公: '▦', 学习: '✎', 游戏: '◆',
+/** 分类图标：统一用 Ant Design Icons（阿里图标库），不用 emoji */
+const CAT_ICON: Record<string, React.ReactNode> = {
+  流媒体: <PlayCircleOutlined />,
+  音乐: <CustomerServiceOutlined />,
+  'AI 工具': <RobotOutlined />,
+  办公: <LaptopOutlined />,
+  学习: <ReadOutlined />,
+  游戏: <TrophyOutlined />,
 };
 /** 品牌色（与前台 BrandIcon 对齐） */
 const BRAND_COLOR: Record<string, string> = {
@@ -60,7 +70,7 @@ function ProductPreview({ form, open }: { form: any; open: boolean }) {
   }, []);
   if (!open) return null;
   const cat = v.category || '流媒体';
-  const icon = CAT_ICON[cat] ?? '📦';
+  const icon = CAT_ICON[cat] ?? <AppstoreOutlined />;
   const tint = CAT_TINT[cat] ?? '#fb9920';
   const saleLeft = v.saleEndsAt ? new Date(v.saleEndsAt).getTime() - Date.now() : 0;
   const fmtLeft = () => {
@@ -71,7 +81,7 @@ function ProductPreview({ form, open }: { form: any; open: boolean }) {
   return (
     <div style={{ position: 'sticky', top: 0 }}>
       <div style={{ fontSize: 12, fontWeight: 800, color: '#888', marginBottom: 8, letterSpacing: 1 }}>
-        👁 前台实时预览
+        <EyeOutlined /> 前台实时预览
         <Tag color="green" style={{ marginLeft: 8 }}>未保存 · 仅预览</Tag>
       </div>
       {/* 商品卡 */}
@@ -81,7 +91,7 @@ function ProductPreview({ form, open }: { form: any; open: boolean }) {
           <span style={{ fontSize: 11.5, fontWeight: 800, background: '#fffdf6', border: '1.5px solid #161412', borderRadius: 999, padding: '2px 10px' }}>{cat}</span>
           {saleLeft > 0 && (
             <span style={{ position: 'absolute', left: 14, bottom: 8, background: '#f62c2b', color: '#fff', border: '1.5px solid #161412', borderRadius: 999, padding: '2px 10px', fontSize: 11, fontWeight: 800 }}>
-              {v.saleLabel || '⚡ 限时特惠'} ⏳ {fmtLeft()}
+              {v.saleLabel || '限时特惠'} <ClockCircleOutlined /> {fmtLeft()}
             </span>
           )}
         </div>
@@ -95,10 +105,10 @@ function ProductPreview({ form, open }: { form: any; open: boolean }) {
       </div>
       {/* 详情要素 */}
       <div style={{ marginTop: 14, background: '#fff', border: '1px solid #e5e7ef', borderRadius: 12, padding: '12px 14px', fontSize: 13, lineHeight: 1.9 }}>
-        <div><b>🚚 交付方式：</b>{v.deliveryMethod || '账号密码'}</div>
-        <div><b>⚡ 交付时效：</b>{v.deliveryTime || '支付后自动交付'}</div>
-        <div><b>🛡️ 售后质保：</b>{v.warranty || '（未填）'}</div>
-        <div><b>⏳ 特惠：</b>{saleLeft > 0 ? `${v.saleLabel || '限时特惠'}，剩 ${fmtLeft()}` : '未开启'}</div>
+        <div><b><TruckIcon /> 交付方式：</b>{v.deliveryMethod || '账号密码'}</div>
+        <div><b><ThunderboltOutlined /> 交付时效：</b>{v.deliveryTime || '支付后自动交付'}</div>
+        <div><b><SafetyCertificateOutlined /> 售后质保：</b>{v.warranty || '（未填）'}</div>
+        <div><b><ClockCircleOutlined /> 特惠：</b>{saleLeft > 0 ? `${v.saleLabel || '限时特惠'}，剩 ${fmtLeft()}` : '未开启'}</div>
       </div>
       <div style={{ marginTop: 10, fontSize: 11.5, color: '#aaa' }}>
         * 价格/库存来自套餐与账号池，不在此预览
@@ -184,7 +194,7 @@ export default function Products() {
     if (saleEndsAt) {
       meta.sale = {
         endsAt: new Date(saleEndsAt).toISOString(),
-        label: saleLabel || '⚡ 限时特惠',
+        label: saleLabel || '限时特惠',
       };
     } else {
       delete meta.sale;
@@ -431,7 +441,7 @@ export default function Products() {
                 <InputNumber min={0} style={{ width: '100%' }} />
               </Form.Item>
               <div style={{ borderTop: '1px dashed #ddd', margin: '4px 0 14px', paddingTop: 10, fontWeight: 700, fontSize: 13 }}>
-                🚚 交付与售后（前台商品页/订阅卡展示）
+                <TruckIcon /> 交付与售后（前台商品页/订阅卡展示）
               </div>
               <Form.Item label="交付方式" name="deliveryMethod" initialValue="账号密码">
                 <Select
@@ -447,13 +457,13 @@ export default function Products() {
                 <Input placeholder="有效期内封号免费补发，工单 2 小时内响应" />
               </Form.Item>
               <div style={{ borderTop: '1px dashed #ddd', margin: '4px 0 14px', paddingTop: 10, fontWeight: 700, fontSize: 13 }}>
-                ⏳ 特惠倒计时（前台商品卡与详情页展示）
+                <ClockCircleOutlined /> 特惠倒计时（前台商品卡与详情页展示）
               </div>
               <Form.Item label="特惠截止时间（留空=关闭特惠）" name="saleEndsAt">
                 <Input type="datetime-local" />
               </Form.Item>
               <Form.Item label="特惠标签" name="saleLabel">
-                <Input placeholder="⚡ 限时特惠" />
+                <Input placeholder="限时特惠" />
               </Form.Item>
             </Form>
           </Col>

@@ -67,7 +67,7 @@ async function preflight() {
     fs.renameSync(DB_FILE, backup);
     // eslint-disable-next-line no-console
     console.warn(
-      `[subshare] ⚠ 检测到旧版本数据库结构不兼容，已备份至 ${path.basename(backup)} 并自动重建。`,
+      `[subshare] [警告] 检测到旧版本数据库结构不兼容，已备份至 ${path.basename(backup)} 并自动重建。`,
     );
   }
 }

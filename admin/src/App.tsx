@@ -12,6 +12,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
+import { SettingOutlined } from '@ant-design/icons';
 import {
   Link,
   Navigate,
@@ -144,7 +145,7 @@ function Login({ onLogin }: { onLogin: () => void }) {
         padding: 16,
       }}
     >
-      <Card style={{ width: 400 }} title="⚙️ SubShare 运营后台">
+      <Card style={{ width: 400 }} title={<><SettingOutlined /> SubShare 运营后台</>}>
         <Tabs
           items={[
             { key: 'login', label: '账号登录', children: loginForm },
@@ -202,7 +203,7 @@ export default function App() {
     <Layout style={{ minHeight: '100vh' }}>
       <Sider theme="dark" width={210} breakpoint="lg" collapsedWidth={64}>
         <div style={{ color: '#fff', fontWeight: 800, fontSize: 17, padding: '18px 22px' }}>
-          ⚙️ SubShare
+          <SettingOutlined /> SubShare
         </div>
         <Menu theme="dark" mode="inline" selectedKeys={[location.pathname]} items={menuItems} />
       </Sider>

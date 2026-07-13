@@ -1,4 +1,5 @@
 import React from 'react';
+import Icon from './Icon';
 
 /**
  * 头像系统（仿 Notion AI 风格）：
@@ -194,8 +195,12 @@ export default function Avatar({
       style={{ width: size, height: size }}
     >
       <span className="av-inner">{inner}</span>
-      {frame === 'crown' && <span className="av-deco av-crown">👑</span>}
-      {frame === 'leaf' && <span className="av-deco av-leaf">🌿</span>}
+      {frame === 'crown' && (
+        <span className="av-deco av-crown"><Icon name="crown" size={14} /></span>
+      )}
+      {frame === 'leaf' && (
+        <span className="av-deco av-leaf"><Icon name="leaf" size={14} /></span>
+      )}
     </span>
   );
 }

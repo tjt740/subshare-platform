@@ -36,10 +36,11 @@ export const CURRENCY_SYMBOL: Record<string, string> = {
   CNY: '¥',
 };
 
+/** 地区选项：原生 <option> 只能放纯文本，故用文字而非 emoji 国旗 */
 export const REGION_OPTIONS = [
-  { value: 'US', label: '🇺🇸 美国 / USD' },
-  { value: 'EU', label: '🇪🇺 欧洲 / EUR' },
-  { value: 'CN', label: '🇨🇳 中国 / CNY' },
+  { value: 'US', label: '美国 · USD' },
+  { value: 'EU', label: '欧洲 · EUR' },
+  { value: 'CN', label: '中国 · CNY' },
 ];
 
 export function money(amount: number | null, currency: string | null) {
@@ -74,14 +75,6 @@ export const PROVIDERS = [
   { value: 'mock-usdt', icon: 'crypto' as const, name: 'USDT', desc: 'TRC20 / ERC20' },
 ];
 
-export const CATEGORY_ICON: Record<string, string> = {
-  流媒体: '🎬',
-  音乐: '🎵',
-  'AI 工具': '🤖',
-  办公: '💼',
-  学习: '📚',
-  游戏: '🎮',
-};
 /* Supari 式明快色块（卡片横幅底色） */
 export const CATEGORY_TINT: Record<string, [string, string]> = {
   流媒体: ['#fb9920', '#fb9920'],

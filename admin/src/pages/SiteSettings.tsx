@@ -11,6 +11,7 @@ import {
   Tag,
   message,
 } from 'antd';
+import { EyeOutlined, LayoutOutlined, MenuOutlined, NotificationOutlined, SafetyCertificateOutlined } from '@ant-design/icons';
 import { api, getProfile } from '../api';
 
 interface SiteConfig {
@@ -145,7 +146,7 @@ export default function SiteSettings() {
               <div style={{ background: '#f6f8ff', borderRadius: 10, padding: 12, fontSize: 12.5 }}>
                 工作流：左侧编辑 → 右侧实时预览 → 提交修改单 → 超级管理员审核 → 审核通过后正式发布。
               </div>
-              <Divider orientation="left">🦸 首页 Hero</Divider>
+              <Divider orientation="left"><LayoutOutlined /> 首页 Hero</Divider>
               <F label="徽章" value={hero.badge} onChange={(v: string) => setHero('badge', v)} placeholder="SAVE ✦ UP TO 80% ✦" />
               <F label="标题第一段" value={hero.t1} onChange={(v: string) => setHero('t1', v)} placeholder="高级订阅" />
               <F label="标题第二段" value={hero.t2} onChange={(v: string) => setHero('t2', v)} placeholder="一起分摊" />
@@ -156,7 +157,7 @@ export default function SiteSettings() {
                 <Input.TextArea rows={3} value={hero.p ?? ''} onChange={(e) => setHero('p', e.target.value)} />
               </div>
 
-              <Divider orientation="left">📊 信任背书</Divider>
+              <Divider orientation="left"><SafetyCertificateOutlined /> 信任背书</Divider>
               {[0, 1, 2, 3].map((i) => (
                 <Row gutter={8} key={i} style={{ marginBottom: 8 }}>
                   <Col span={9}><Input addonBefore={`#${i + 1}`} value={trust[i]?.b ?? ''} onChange={(e) => setTrust(i, 'b', e.target.value)} /></Col>
@@ -164,7 +165,7 @@ export default function SiteSettings() {
                 </Row>
               ))}
 
-              <Divider orientation="left">📣 顶部公告</Divider>
+              <Divider orientation="left"><NotificationOutlined /> 顶部公告</Divider>
               <Input.TextArea
                 rows={4}
                 value={announce.join('\n')}
@@ -172,7 +173,7 @@ export default function SiteSettings() {
                 onChange={(e) => setCfg((c) => ({ ...c, announce: e.target.value.split('\n').map((x) => x.trim()).filter(Boolean) }))}
               />
 
-              <Divider orientation="left">🦶 页脚</Divider>
+              <Divider orientation="left"><MenuOutlined /> 页脚</Divider>
               <F label="关于第一句" value={footer.aboutP1} onChange={(v: string) => setFooter('aboutP1', v)} />
               <F label="关于第二句" value={footer.aboutP2} onChange={(v: string) => setFooter('aboutP2', v)} />
               <F label="服务保障 1" value={footer.g1} onChange={(v: string) => setFooter('g1', v)} />
@@ -184,7 +185,7 @@ export default function SiteSettings() {
           <Col xs={24} xl={14}>
             <div style={{ position: 'sticky', top: 16 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <b>👁 真实前台实时预览</b>
+                <b><EyeOutlined /> 真实前台实时预览</b>
                 <Segmented value={previewMode} onChange={(value) => setPreviewMode(value as '桌面' | '手机')} options={['桌面', '手机']} />
               </div>
               <div style={{ background: '#e8eaf0', border: '1px solid #d5d8e2', borderRadius: 12, padding: 10, minHeight: 660, display: 'flex', justifyContent: 'center' }}>

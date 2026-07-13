@@ -1302,7 +1302,7 @@ export class AdminService {
           messageType: 'text',
           metadata: JSON.stringify({ action: 'reissue' }),
           content:
-            '✅ 已为您补发新凭据（旧账号已作废）。请前往「我的订阅」查看最新账号密码；如仍有异常请直接回复本工单。',
+            '已为您补发新凭据（旧账号已作废）。请前往「我的订阅」查看最新账号密码；如仍有异常请直接回复本工单。',
         }),
       );
     } else if (action === 'refund') {
@@ -1319,7 +1319,7 @@ export class AdminService {
           messageType: 'text',
           metadata: JSON.stringify({ action: 'refund' }),
           content:
-            '✅ 订单已退款：金额已按汇率折算退回您的钱包余额，可在「钱包」页查看流水。感谢理解与支持！',
+            '订单已退款：金额已按汇率折算退回您的钱包余额，可在「钱包」页查看流水。感谢理解与支持！',
         }),
       );
     } else {

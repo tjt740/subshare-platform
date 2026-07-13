@@ -140,7 +140,7 @@ export default function Pay() {
   return (
     <div>
       <div className="steps">
-        <div className="step on"><span className="dot">✓</span>{t('steps.confirm')}</div>
+        <div className="step on"><span className="dot"><Icon name="check" size={12} /></span>{t('steps.confirm')}</div>
         <span className="line" />
         <div className="step on"><span className="dot">2</span>{t('steps.pay')}</div>
         <span className="line" />

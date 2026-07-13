@@ -374,7 +374,7 @@ export default function Account() {
                       <CredentialRow label={'ACCT'} value={s.credentials.username} />
                       <CredentialRow label={'PWD'} value={s.credentials.password} />
                       {s.credentials.note && (
-                        <div className="cred-note">📌 {s.credentials.note}</div>
+                        <div className="cred-note"><Icon name="pin" size={13} /> {s.credentials.note}</div>
                       )}
                     </>
                   ) : (
@@ -684,7 +684,7 @@ export default function Account() {
                   <b className={`lv-badge lv${L.lv}`}>LV{L.lv}</b>
                   <span>{t(`lv.${L.lv}`)}</span>
                   <span className="muted small">成长值 ≥ ${L.need}</span>
-                  {(user.level ?? 1) >= L.lv && <span className="lv-ok">✓</span>}
+                  {(user.level ?? 1) >= L.lv && <span className="lv-ok"><Icon name="check" size={13} /></span>}
                 </div>
               ))}
             </div>

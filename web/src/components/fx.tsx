@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Icon from './Icon';
 import { useI18n } from '../i18n';
 
 /* ============ 跑马灯 ============ */
@@ -214,7 +215,7 @@ export function SaleCountdown({
   const tstr = `${d > 0 ? d + 'd ' : ''}${pad(Math.floor((s % 86400) / 3600))}:${pad(Math.floor((s % 3600) / 60))}:${pad(s % 60)}`;
   return (
     <span className={`sale-chip ${className}`}>
-      {label || t('sale.default')} ⏳ {tstr}
+      {label || t('sale.default')} <Icon name="timer" size={12} /> {tstr}
     </span>
   );
 }
@@ -315,8 +316,12 @@ export function StatusClock({ compact = false }: { compact?: boolean }) {
           <i className={`status-dot ${ok ? '' : 'bad'}`} />
           {t(ok ? 'status.ok' : 'status.degraded')}
         </span>
-        <span>
-          🕐 {timeStr} · 🌍 {tz} · ⏱ {t('status.uptime', { t: fmtUp(up) })}
+        <span className="status-meta">
+          <Icon name="clock" size={13} /> {timeStr}
+          <span className="sep">·</span>
+          <Icon name="globe" size={13} /> {tz}
+          <span className="sep">·</span>
+          <Icon name="timer" size={13} /> {t('status.uptime', { t: fmtUp(up) })}
         </span>
       </div>
     </div>
@@ -383,7 +388,7 @@ export function ThemePicker() {
                 {t.name}
                 <small>{t.desc}</small>
               </span>
-              {theme === t.id && <span className="tp-check">✓</span>}
+              {theme === t.id && <span className="tp-check"><Icon name="check" size={13} /></span>}
             </button>
           ))}
         </div>

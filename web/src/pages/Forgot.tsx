@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { api } from '../api';
+import Icon from '../components/Icon';
 
 /** 忘记密码 → 获取重置令牌 → 设置新密码（演示环境令牌直接返回；生产走邮件） */
 export default function Forgot() {
@@ -113,7 +114,7 @@ export default function Forgot() {
                 aria-label={showPwd ? '隐藏密码' : '显示密码'}
                 onClick={() => setShowPwd((s) => !s)}
               >
-                {showPwd ? '🙈' : '👁'}
+                <Icon name={showPwd ? 'eyeOff' : 'eye'} size={16} />
               </button>
             </div>
           </label>

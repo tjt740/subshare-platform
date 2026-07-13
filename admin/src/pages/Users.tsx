@@ -178,7 +178,7 @@ export default function Users() {
           value={lvValue}
           onChange={setLvValue}
           options={[
-            { value: 'auto', label: `🌐 自动（当前 LV${lvUser?.autoLevel ?? 1}）` },
+            { value: 'auto', label: `自动（当前 LV${lvUser?.autoLevel ?? 1}）` },
             ...[1, 2, 3, 4, 5].map((n) => ({
               value: String(n),
               label: `LV${n} ${LV_NAME[n]}`,

@@ -19,6 +19,7 @@ import {
   Tag,
   message,
 } from 'antd';
+import { FileTextOutlined, UserOutlined } from '@ant-design/icons';
 import { api } from '../api';
 import { FinanceLineChart } from '../components/SimpleCharts';
 
@@ -430,8 +431,8 @@ export default function Inventory() {
                         </div>
                         {s.status === 'assigned' && (
                           <div style={{ fontSize: 11.5, color: '#555', marginTop: 4, lineHeight: 1.6 }}>
-                            <div>👤 {s.userEmail}</div>
-                            <div>🧾 {s.orderNo}</div>
+                            <div><UserOutlined /> {s.userEmail}</div>
+                            <div><FileTextOutlined /> {s.orderNo}</div>
                           </div>
                         )}
                       </div>
