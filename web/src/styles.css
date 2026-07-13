@@ -148,16 +148,47 @@
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html { scroll-behavior: smooth; }
+/* ============ 移动端优先：全局横向溢出防护 ============
+ * 移动端能左右滑动整个页面（背景跟着动）= 文档宽度超过视口。
+ * 三道防线：
+ * 1) html/body 都禁止横向滚动。用 clip 而非 hidden —— hidden 会把 body 变成滚动容器，
+ *    连带破坏顶栏的 position: sticky；clip 只裁剪、不产生滚动容器。
+ * 2) flex/grid 子项默认 min-width:auto，遇到长文本/nowrap 时拒绝收缩，是撑破视口的头号元凶，
+ *    统一置 0 允许收缩。
+ * 3) 媒体元素不得超过容器宽度。
+ */
+html {
+  scroll-behavior: smooth;
+  overflow-x: hidden;   /* 旧浏览器兜底 */
+  overflow-x: clip;     /* 现代浏览器：裁剪但不破坏 sticky */
+  -webkit-text-size-adjust: 100%;  /* 防 iOS 横屏自动放大字号 */
+}
+img, svg, video, canvas, iframe { max-width: 100%; }
 body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
   line-height: 1.65;
   -webkit-font-smoothing: antialiased;
+  width: 100%;
+  max-width: 100%;
   overflow-x: hidden;
+  overflow-x: clip;
   transition: background 0.4s ease, color 0.4s ease;
 }
+/* flex/grid 子项默认 min-width:auto，长文本/nowrap 时不肯收缩 → 撑破视口。
+   顶栏那一行（品牌+铃铛+购物车+菜单）就是这么把整页顶宽的。 */
+.header-inner > *,
+.header-right > *,
+.cart-item > *,
+.ci-info,
+.co-row > *,
+.as-item > *,
+.sub-meta > *,
+.detail-hero > *,
+.panel > *,
+.marquee,
+.tool-right { min-width: 0; }
 /* 纸张噪点（移动端关闭，省性能） */
 body::after {
   content: '';
@@ -319,7 +350,19 @@ body.has-cursor, body.has-cursor a, body.has-cursor button { cursor: none; }
   cursor: pointer; box-shadow: var(--sh); background: var(--card); color: var(--ink);
   transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease), background 0.2s, color 0.2s;
   -webkit-tap-highlight-color: transparent;
+  /* 按钮文案永不换行：换行会把按钮撑成两行、破坏圆角胶囊造型 */
+  white-space: nowrap;
+  min-height: 44px;          /* 移动端触控热区标准 */
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;   /* 极端长文案宁可省略号，也不换行/不溢出 */
 }
+/* 按钮组：容器允许换行，按钮本身不换行（避免一行挤不下时溢出视口） */
+.btn-row, .as-actions {
+  display: flex; flex-wrap: wrap; gap: 8px;
+}
+.btn-sm { min-height: 34px; padding: 7px 14px; }  /* 表格内小按钮不强制 44px，否则行高失控 */
+.btn-block { width: 100%; }
 .btn:hover:not(:disabled) { transform: translate(-2px, -2px); box-shadow: var(--sh-md); }
 .btn:active:not(:disabled) { transform: translate(1px, 1px); box-shadow: var(--sh-press); }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; box-shadow: var(--sh-sm); }
@@ -1400,7 +1443,16 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
 .ni-title { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
 .ni-body { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
 .ni-time { font-size: 11px; color: var(--muted); margin-top: 5px; }
-@media (max-width: 760px) { .notif-panel { right: -40px; } }
+/* 移动端：通知面板绝不能越过视口右边（原来 right:-40px 会把整页顶宽 40px，
+   造成「整体背景可以左右滑动」）。改为贴着安全边距铺满。 */
+@media (max-width: 760px) {
+  .notif-panel {
+    right: 0;
+    left: auto;
+    width: min(320px, calc(100vw - 24px));
+    max-width: calc(100vw - 24px);
+  }
+}
 
 /* ============ 全站背景层（固定 + 滚动视差，与流星/星点风格统一） ============ */
 .site-bg {
@@ -1474,4 +1526,38 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
 /* 尊重减少动效：关闭漂移/闪烁/视差，仅保留静态纹理 */
 @media (prefers-reduced-motion: reduce) {
   .bg-orb, .bg-grid, .bg-stars { animation: none !important; transform: none !important; }
+}
+
+/* ============ 移动端优先：细节打磨 ============ */
+@media (max-width: 640px) {
+  /* 按钮：文案不换行的前提下，靠缩小内边距/字号来适配窄屏，而不是让它折行 */
+  .btn { padding: 10px 16px; font-size: 13.5px; }
+  .btn-lg { padding: 13px 18px; font-size: 15px; }
+  .btn-sm { padding: 6px 12px; font-size: 12.5px; min-height: 32px; }
+  /* 整宽按钮在窄屏保持整宽，长文案居中不溢出 */
+  .btn-block { width: 100%; max-width: 100%; }
+
+  /* 顶栏一行放得下：品牌收窄、右侧控件紧凑 */
+  .header-inner { gap: 8px; }
+  .brand-name { max-width: 42vw; overflow: hidden; text-overflow: ellipsis; }
+  .header-right { gap: 6px; }
+  .bell-btn, .cart-btn, .menu-btn { width: 36px; height: 36px; flex: 0 0 auto; }
+
+  /* 表格：横向滚动条要明显可感知，避免用户以为内容被截断 */
+  .table-wrap { -webkit-overflow-scrolling: touch; overscroll-behavior-x: contain; }
+
+  /* 底部安全区（iPhone 手势条） */
+  .mobile-tabbar { padding-bottom: env(safe-area-inset-bottom); }
+  .mobile-buybar { padding-bottom: calc(10px + env(safe-area-inset-bottom)); }
+
+  /* 触控热区：链接/图标按钮至少 40px */
+  .foot-body a, .notif-item, .tp-item { min-height: 40px; }
+}
+
+/* 超窄屏（≤360px，如 iPhone SE / 小安卓）：进一步压缩 */
+@media (max-width: 360px) {
+  .btn { padding: 9px 13px; font-size: 13px; }
+  .btn-lg { font-size: 14px; }
+  .brand-name { max-width: 34vw; }
+  .container { padding: 0 10px; }
 }

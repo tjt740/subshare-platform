@@ -6,6 +6,7 @@ import { AppProvider } from './store';
 import { I18nProvider } from './i18n';
 import './styles.css';
 import { initTracking } from './track';
+import { initOverflowDetector } from './dev-overflow';
 
 // 在渲染前应用主题，避免闪烁
 const savedTheme = localStorage.getItem('ss_theme') || 'supari';
@@ -13,6 +14,9 @@ document.documentElement.dataset.theme = savedTheme;
 
 // 埋点初始化（自动点击 + PV + 会话）
 initTracking();
+
+// 开发期横向溢出检测（窄屏自动扫描；控制台可随时调 __findOverflow()）
+initOverflowDetector();
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
