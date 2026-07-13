@@ -209,15 +209,22 @@ body.has-cursor, body.has-cursor a, body.has-cursor button { cursor: none; }
 .spin-star { display: inline-block; animation: spin 3s linear infinite; margin-left: 8px; color: var(--red); }
 
 /* ============ 自定义光标 ============ */
-.cursor-dot, .cursor-ring { position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1001; }
+/* 性能：光标只用 transform + opacity/颜色（合成层），
+   绝不动画 width/height/margin —— 那会每帧触发 layout，就是鼠标卡顿的根因 */
+.cursor-dot, .cursor-ring {
+  position: fixed; top: 0; left: 0; pointer-events: none; z-index: 1001;
+  will-change: transform; backface-visibility: hidden; contain: strict;
+}
 .cursor-dot { width: 8px; height: 8px; margin: -4px; background: var(--red); border-radius: 50%; }
 .cursor-ring {
   width: 34px; height: 34px; margin: -17px; border: 2px solid var(--ink); border-radius: 50%;
-  transition: width 0.25s var(--ease), height 0.25s var(--ease), margin 0.25s var(--ease), background 0.25s, opacity 0.25s;
+  /* 尺寸恒定，放大由 JS 的 scale() 缓动完成；这里只过渡纯绘制属性 */
+  transition: opacity 0.2s linear, background-color 0.2s linear, border-color 0.2s linear;
   opacity: 0.5;
 }
-.cursor-ring.hot { width: 50px; height: 50px; margin: -25px; background: color-mix(in srgb, var(--red) 14%, transparent); border-color: var(--red); opacity: 1; }
+.cursor-ring.hot { background: color-mix(in srgb, var(--red) 14%, transparent); border-color: var(--red); opacity: 1; }
 @media (pointer: coarse) { .cursor-dot, .cursor-ring { display: none; } }
+@media (prefers-reduced-motion: reduce) { .cursor-dot, .cursor-ring { display: none; } }
 
 /* ============ 跑马灯 ============ */
 .marquee { overflow: hidden; white-space: nowrap; user-select: none; }
@@ -1081,8 +1088,11 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
 /* ===== Canvas 动效 ===== */
 .hero { overflow: hidden; }
 .hero-canvas {
-  position: absolute; inset: 0; width: 100%; pointer-events: auto;
+  position: absolute; inset: 0; width: 100%;
+  /* 事件监听在父容器 .hero 上，画布本身不拦截点击，避免命中测试开销 */
+  pointer-events: none;
   z-index: 0; opacity: 0.85;
+  contain: strict; /* 隔离布局/绘制，画布重绘不牵连页面其他部分 */
 }
 .hero > *:not(.hero-canvas) { position: relative; z-index: 1; }
 .confetti-canvas {

@@ -40,7 +40,18 @@ export function BootSplash() {
   );
 }
 
-/* ============ 自定义光标（仅桌面精准指针设备） ============ */
+/* ============ 自定义光标（仅桌面精准指针设备） ============
+ * 性能要点（修复鼠标卡顿）：
+ * 1) mousemove 只记录坐标，绝不写 DOM —— 高刷鼠标可达 1000Hz，逐事件写样式必然掉帧
+ * 2) 所有 DOM 写入合并到单个 rAF（每帧最多一次）
+ * 3) closest() 选择器匹配只在 e.target 真正变化时执行（原来每个事件都遍历 DOM 树）
+ * 4) 悬停放大用 transform: scale（合成层）而非 width/height/margin（会触发 layout）
+ * 5) 鼠标静止时自动停掉 rAF，省电；移动时再唤醒
+ */
+const HOT_SELECTOR =
+  'a, button, .plan-item, .provider-item, .product-card, .amount-chip, .cat-chip, .ticket-row, select, input, textarea, summary, .tab, .theme-swatch';
+const RING_HOT_SCALE = 50 / 34; // 悬停时 34px → 50px，用 scale 实现
+
 export function Cursor() {
   const dotRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
@@ -50,30 +61,70 @@ export function Cursor() {
     if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const dot = dotRef.current!;
     const ring = ringRef.current!;
-    let rx = -100, ry = -100, tx = -100, ty = -100, raf = 0;
+
+    let tx = -100, ty = -100; // 目标（鼠标真实位置）
+    let rx = -100, ry = -100; // 圆环缓动位置
+    let rs = 1;               // 圆环缓动缩放
+    let dx = -100, dy = -100; // 上一帧已写入的点位置
+    let hot = false;
+    let hotApplied = false;
+    let lastTarget: EventTarget | null = null;
+    let raf = 0;
+    let running = false;
+
+    const loop = () => {
+      // —— 每帧只写一次 DOM ——
+      if (dx !== tx || dy !== ty) {
+        dx = tx; dy = ty;
+        dot.style.transform = `translate3d(${tx}px, ${ty}px, 0)`;
+      }
+      rx += (tx - rx) * 0.18;
+      ry += (ty - ry) * 0.18;
+      rs += ((hot ? RING_HOT_SCALE : 1) - rs) * 0.2;
+      ring.style.transform = `translate3d(${rx}px, ${ry}px, 0) scale(${rs})`;
+
+      if (hot !== hotApplied) {
+        hotApplied = hot;
+        ring.classList.toggle('hot', hot); // 只切颜色/透明度（paint），不触发 layout
+      }
+
+      // 已经追上鼠标 → 停掉循环省电，下次移动再唤醒
+      const settled =
+        Math.abs(tx - rx) < 0.1 &&
+        Math.abs(ty - ry) < 0.1 &&
+        Math.abs((hot ? RING_HOT_SCALE : 1) - rs) < 0.005;
+      if (settled) {
+        running = false;
+        raf = 0;
+        return;
+      }
+      raf = requestAnimationFrame(loop);
+    };
+
+    const wake = () => {
+      if (!running) {
+        running = true;
+        raf = requestAnimationFrame(loop);
+      }
+    };
 
     const move = (e: MouseEvent) => {
       tx = e.clientX;
       ty = e.clientY;
-      dot.style.transform = `translate(${tx}px, ${ty}px)`;
-      const target = e.target as HTMLElement;
-      const hot = !!target.closest(
-        'a, button, .plan-item, .provider-item, .product-card, .amount-chip, .cat-chip, .ticket-row, select, input, textarea, summary, .tab, .theme-swatch',
-      );
-      ring.classList.toggle('hot', hot);
+      // closest() 很贵：只在指针真正换了元素时才重新匹配
+      if (e.target !== lastTarget) {
+        lastTarget = e.target;
+        hot = !!(e.target as HTMLElement)?.closest?.(HOT_SELECTOR);
+      }
+      wake();
     };
-    const loop = () => {
-      rx += (tx - rx) * 0.18;
-      ry += (ty - ry) * 0.18;
-      ring.style.transform = `translate(${rx}px, ${ry}px)`;
-      raf = requestAnimationFrame(loop);
-    };
+
     document.addEventListener('mousemove', move, { passive: true });
-    raf = requestAnimationFrame(loop);
     document.body.classList.add('has-cursor');
+    wake();
     return () => {
       document.removeEventListener('mousemove', move);
-      cancelAnimationFrame(raf);
+      if (raf) cancelAnimationFrame(raf);
       document.body.classList.remove('has-cursor');
     };
   }, []);
