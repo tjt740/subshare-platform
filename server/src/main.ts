@@ -9,6 +9,31 @@ import { AppModule } from './app.module';
 import { ALL_ENTITIES, InventoryAccount, Order, SiteSetting, User } from './entities';
 import { runSeed } from './seed-data';
 
+/**
+ * 极简 .env 加载（零依赖，避免为几个 OAuth 密钥引入 dotenv）
+ * 已存在的环境变量优先，不会被文件覆盖。
+ */
+function loadEnv() {
+  const file = path.join(__dirname, '..', '.env');
+  if (!fs.existsSync(file)) return;
+  for (const raw of fs.readFileSync(file, 'utf8').split('\n')) {
+    const line = raw.trim();
+    if (!line || line.startsWith('#')) continue;
+    const eq = line.indexOf('=');
+    if (eq < 1) continue;
+    const key = line.slice(0, eq).trim();
+    let val = line.slice(eq + 1).trim();
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
+      val = val.slice(1, -1);
+    }
+    if (process.env[key] === undefined) process.env[key] = val;
+  }
+}
+loadEnv();
+
 const DB_FILE =
   process.env.DB_FILE || path.join(__dirname, '..', 'data', 'app.db');
 

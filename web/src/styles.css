@@ -854,10 +854,16 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
   transition: color 0.45s var(--ease); user-select: none;
 }
 .footer-mega:hover { color: var(--red); -webkit-text-stroke-color: var(--red); }
-.footer-inner { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 26px; padding: 30px 0 26px; font-size: 13.5px; }
+/* 桌面：四栏平铺（此前是 3 栏模板放 4 列，最后一列被挤到第二行） */
+.footer-inner { display: grid; grid-template-columns: 1.7fr 1fr 1fr 1fr; gap: 26px; padding: 30px 0 26px; font-size: 13.5px; }
 .footer-inner h4 { font-family: var(--font-display); font-size: 14px; margin-bottom: 11px; color: var(--inv-accent); text-transform: uppercase; letter-spacing: 0.1em; }
 .footer-inner a, .footer-inner p { color: color-mix(in srgb, var(--inv-fg) 72%, transparent); display: block; margin-bottom: 8px; font-weight: 500; }
 .footer-inner a:hover { color: var(--inv-accent); }
+/* 页脚分栏用 <details>：桌面强制展开且标题不可点，移动端才变成手风琴 */
+.foot-col > summary { list-style: none; cursor: default; display: flex; align-items: center; justify-content: space-between; }
+.foot-col > summary::-webkit-details-marker { display: none; }
+.foot-col > summary h4 { margin-bottom: 11px; }
+.foot-caret { display: none; }
 .footer-copy { border-top: 1px solid color-mix(in srgb, var(--inv-fg) 18%, transparent); text-align: center; color: color-mix(in srgb, var(--inv-fg) 50%, transparent); font-size: 12.5px; padding: 15px 0; font-weight: 600; }
 .site-footer .announce { border-top: 1px solid color-mix(in srgb, var(--inv-fg) 18%, transparent); background: transparent; color: var(--inv-accent); }
 
@@ -1253,7 +1259,28 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
   .detail-hero .sub { justify-content: center; }
   .mobile-buybar { display: flex; }
   .detail-buy .buy-cta { display: none; }
-  .footer-inner { grid-template-columns: 1fr; gap: 12px; }
+  /* ===== 移动端页脚瘦身：巨标题压扁 + 分栏折叠 + 隐藏时钟 ===== */
+  .footer-mega { font-size: clamp(30px, 11vw, 52px); padding: 20px 0 6px; -webkit-text-stroke-width: 1.5px; }
+  .footer-clock { display: none; }             /* 时钟在移动端不再堆高底部 */
+  .footer-inner { grid-template-columns: 1fr; gap: 0; padding: 6px 0 10px; }
+
+  .foot-col { border-bottom: 1px solid color-mix(in srgb, var(--inv-fg) 14%, transparent); }
+  .foot-col > summary {
+    cursor: pointer; padding: 13px 2px; min-height: 44px;  /* 44px 触控热区 */
+    -webkit-tap-highlight-color: transparent;
+  }
+  .foot-col > summary h4 { margin-bottom: 0; font-size: 13px; }
+  .foot-caret {
+    display: inline-flex; color: color-mix(in srgb, var(--inv-fg) 55%, transparent);
+    transition: transform 0.22s var(--ease);
+  }
+  .foot-col[open] > summary .foot-caret { transform: rotate(180deg); }
+  .foot-col[open] > summary h4 { color: var(--inv-accent); }
+  .foot-body { padding: 0 2px 12px; animation: footOpen 0.22s var(--ease) both; }
+  .foot-body a, .foot-body p { margin-bottom: 10px; font-size: 13.5px; }
+  .foot-body a { min-height: 30px; }
+  @keyframes footOpen { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+
   .site-footer { padding-bottom: calc(56px + env(safe-area-inset-bottom)); }
   .cs-fab { right: 12px; bottom: calc(132px + env(safe-area-inset-bottom)); width: 48px; height: 48px; font-size: 19px; opacity: 0.95; }
   .cs-panel { right: 8px; left: 8px; width: auto; bottom: calc(190px + env(safe-area-inset-bottom)); height: 420px; max-height: calc(100vh - 260px); }
@@ -1268,4 +1295,43 @@ tbody tr:hover { background: color-mix(in srgb, var(--yellow) 22%, transparent);
   .cart-layout { grid-template-columns: 1fr; }
   .cart-summary { position: static; }
   .as-item b { min-width: 100%; }
+}
+
+/* ============ 第三方登录 ============ */
+.oauth-box { margin-top: 18px; }
+.oauth-sep {
+  display: flex; align-items: center; gap: 10px; margin: 4px 0 14px;
+  color: var(--muted); font-size: 12.5px; font-weight: 600;
+}
+.oauth-sep::before, .oauth-sep::after {
+  content: ''; flex: 1; height: 1px;
+  background: color-mix(in srgb, var(--ink) 14%, transparent);
+}
+.oauth-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.oauth-btn {
+  display: flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 11px 8px; min-height: 44px; font-size: 13px; font-weight: 700;
+  border: 1.5px solid color-mix(in srgb, var(--ink) 16%, transparent);
+  border-radius: var(--radius-sm); background: var(--card);
+  transition: border-color 0.2s var(--ease), transform 0.2s var(--ease), color 0.2s;
+}
+.oauth-btn:hover { transform: translateY(-2px); }
+.oauth-btn.oa-google:hover { border-color: #4285f4; color: #4285f4; }
+.oauth-btn.oa-github:hover { border-color: var(--ink); color: var(--ink); }
+.oauth-btn.oa-microsoft:hover { border-color: #0078d4; color: #0078d4; }
+.oauth-note { margin-top: 12px; line-height: 1.55; }
+.oauth-note code {
+  background: color-mix(in srgb, var(--ink) 8%, transparent);
+  padding: 1px 5px; border-radius: 4px; font-size: 11.5px;
+}
+.oauth-landing { text-align: center; }
+.oauth-spin { display: inline-flex; color: var(--red); animation: spin 1s linear infinite; margin-bottom: 10px; }
+@media (max-width: 760px) {
+  .oauth-grid { grid-template-columns: 1fr; }   /* 移动端一行一个，热区更大 */
+  .oauth-btn { justify-content: flex-start; padding-left: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .oauth-btn:hover { transform: none; }
+  .oauth-spin { animation: none; }
+  .foot-body { animation: none; }
 }

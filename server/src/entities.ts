@@ -38,6 +38,10 @@ export class User {
   /** 密码重置令牌（演示：接口直接返回；生产走邮件） */
   @Column({ type: 'text', nullable: true }) resetToken: string | null;
   @Column({ type: 'datetime', nullable: true }) resetExpires: Date | null;
+  /** 第三方登录：注册来源 local | google | github | microsoft */
+  @Column({ type: 'text', default: 'local' }) provider: string;
+  /** 已绑定的第三方账号，JSON: { google: 'sub-id', github: '123' } */
+  @Column({ type: 'text', default: '{}' }) providerIds: string;
   @CreateDateColumn() createdAt: Date;
 }
 

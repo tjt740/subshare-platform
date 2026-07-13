@@ -159,7 +159,14 @@ export default function Home() {
             placeholder={t('catalog.searchPh')}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
-            onBlur={(e) => e.target.value && track('search', { keyword: e.target.value })}
+            onBlur={(e) =>
+              e.target.value &&
+              track('search', {
+                q: e.target.value,          // 后台按 q 聚合搜索词
+                keyword: e.target.value,
+                results: filtered.length,   // 0 结果 = 需要补品类的信号
+              })
+            }
           />
         </div>
       </div>

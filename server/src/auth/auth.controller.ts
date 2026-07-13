@@ -1,5 +1,16 @@
-import { Body, Controller, Get, Patch, Post, Req, UseGuards } from '@nestjs/common';
-import { Request } from 'express';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  Res,
+  UseGuards,
+} from '@nestjs/common';
+import { Request, Response } from 'express';
 import {
   IsEmail,
   IsOptional,
@@ -8,6 +19,7 @@ import {
   MaxLength,
 } from 'class-validator';
 import { AuthService } from './auth.service';
+import { OAuthService } from './oauth.service';
 import { CurrentUser, JwtAuthGuard, JwtUser } from './auth.common';
 
 class RegisterDto {
@@ -52,7 +64,57 @@ class ChangePasswordDto {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly auth: AuthService) {}
+  constructor(
+    private readonly auth: AuthService,
+    private readonly oauth: OAuthService,
+  ) {}
+
+  /* ============ 第三方登录（Google / GitHub / Microsoft） ============ */
+
+  /** 前台据此渲染按钮：哪些可用、是真实 OAuth 还是演示模式 */
+  @Get('oauth/providers')
+  providers() {
+    return this.oauth.listProviders();
+  }
+
+  /** 第 1 步：跳转到厂商授权页（未配置密钥则直通演示回调） */
+  @Get('oauth/:provider/start')
+  async oauthStart(
+    @Param('provider') provider: string,
+    @Query('next') next: string,
+    @Res() res: Response,
+  ) {
+    const url = await this.oauth.startUrl(provider, next || '/');
+    return res.redirect(url);
+  }
+
+  /** 第 2 步：厂商回调 → 换 token → 建号/绑定 → 带本站 JWT 回前台 */
+  @Get('oauth/:provider/callback')
+  async oauthCallback(
+    @Param('provider') provider: string,
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Query('error') error: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ) {
+    const web = (process.env.WEB_ORIGIN || 'http://localhost:5173').trim();
+    if (error) return res.redirect(`${web}/login?oauth_error=${encodeURIComponent(error)}`);
+    try {
+      const url = await this.oauth.handleCallback(
+        provider,
+        code,
+        state,
+        (req.headers['x-forwarded-for'] as string) || req.ip || '',
+        req.headers['user-agent'] || '',
+      );
+      return res.redirect(url);
+    } catch (e: any) {
+      return res.redirect(
+        `${web}/login?oauth_error=${encodeURIComponent(e?.message || '授权失败')}`,
+      );
+    }
+  }
 
   @Post('register')
   register(@Body() dto: RegisterDto) {

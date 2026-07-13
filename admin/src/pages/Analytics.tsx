@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   Card,
   Col,
-  Drawer,
   Empty,
   Progress,
   Row,
@@ -12,14 +11,17 @@ import {
   Table,
   Tabs,
   Tag,
-  Timeline,
   message,
 } from 'antd';
 import { api } from '../api';
+import UserTrail from '../components/UserTrail';
 
 /** 埋点分析：概览 / 漏斗 / 事件流 / 单用户行为轨迹 */
 interface Overview {
-  totals: { pv: number; uv: number; sessions: number; events: number; conversion: number };
+  totals: {
+    pv: number; uv: number; sessions: number; events: number;
+    conversion: number; avgDwellSec: number; bounceRate: number;
+  };
   byName: { name: string; count: number }[];
   funnel: { key: string; label: string; users: number; rate: number; dropFromPrev: number }[];
   topProducts: { title: string; views: number; carts: number; buys: number }[];
@@ -27,6 +29,17 @@ interface Overview {
   devices: { name: string; count: number }[];
   referrers: { name: string; count: number }[];
   trend: { date: string; pv: number; uv: number; orders: number }[];
+  engagement: {
+    avgDwellSec: number;
+    bounceRate: number;
+    scrollDist: { depth: string; count: number }[];
+    dwellByPage: { path: string; avgSec: number; views: number }[];
+    exitPages: { path: string; count: number }[];
+  };
+  searchTerms: { term: string; count: number }[];
+  authSources: { method: string; logins: number; signups: number }[];
+  errors: { message: string; count: number; path: string }[];
+  rageClicks: { where: string; count: number }[];
 }
 
 const EVENT_LABEL: Record<string, string> = {
@@ -49,6 +62,11 @@ const EVENT_LABEL: Record<string, string> = {
   onboarding_start: '开始引导',
   onboarding_skip: '跳过引导',
   onboarding_done: '完成引导',
+  page_leave: '离开页面',
+  scroll_depth: '滚动深度',
+  rage_click: '暴力点击',
+  js_error: '前端异常',
+  oauth_start: '发起三方登录',
 };
 const label = (n: string) => EVENT_LABEL[n] ?? n;
 
@@ -61,8 +79,8 @@ export default function Analytics() {
   const [evTotal, setEvTotal] = useState(0);
   const [evPage, setEvPage] = useState(1);
   const [evName, setEvName] = useState<string | undefined>();
-  // 用户轨迹
-  const [trailUser, setTrailUser] = useState<any | null>(null);
+  // 用户轨迹（抽屉组件与「用户管理」共用）
+  const [trailId, setTrailId] = useState<number | null>(null);
 
   const loadOverview = useCallback(() => {
     setLoading(true);
@@ -85,14 +103,6 @@ export default function Analytics() {
   }, [evPage, evName]);
   useEffect(loadEvents, [loadEvents]);
 
-  async function openTrail(userId: number) {
-    try {
-      setTrailUser(await api(`/admin/analytics/user/${userId}`));
-    } catch (e: any) {
-      message.error(e.message);
-    }
-  }
-
   const maxTrend = Math.max(1, ...(ov?.trend.map((t) => Math.max(t.pv, t.uv)) ?? [1]));
 
   return (
@@ -113,13 +123,28 @@ export default function Analytics() {
         }
       >
         <Row gutter={[12, 12]}>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="页面浏览 PV" value={ov?.totals.pv ?? 0} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="独立访客 UV" value={ov?.totals.uv ?? 0} /></Card></Col>
-          <Col xs={12} md={6}><Card size="small"><Statistic title="会话数" value={ov?.totals.sessions ?? 0} /></Card></Col>
-          <Col xs={12} md={6}>
+          <Col xs={12} md={4}><Card size="small"><Statistic title="页面浏览 PV" value={ov?.totals.pv ?? 0} /></Card></Col>
+          <Col xs={12} md={4}><Card size="small"><Statistic title="独立访客 UV" value={ov?.totals.uv ?? 0} /></Card></Col>
+          <Col xs={12} md={4}><Card size="small"><Statistic title="会话数" value={ov?.totals.sessions ?? 0} /></Card></Col>
+          <Col xs={12} md={4}>
+            <Card size="small">
+              <Statistic title="人均停留" value={ov?.totals.avgDwellSec ?? 0} suffix="秒" />
+            </Card>
+          </Col>
+          <Col xs={12} md={4}>
             <Card size="small">
               <Statistic
-                title="浏览→支付转化率"
+                title="跳出率"
+                value={ov?.totals.bounceRate ?? 0}
+                suffix="%"
+                valueStyle={{ color: (ov?.totals.bounceRate ?? 0) > 70 ? '#dc2626' : undefined }}
+              />
+            </Card>
+          </Col>
+          <Col xs={12} md={4}>
+            <Card size="small">
+              <Statistic
+                title="浏览→支付转化"
                 value={ov?.totals.conversion ?? 0}
                 suffix="%"
                 valueStyle={{ color: (ov?.totals.conversion ?? 0) > 0 ? '#16a34a' : undefined }}
@@ -246,6 +271,133 @@ export default function Analytics() {
               ),
             },
             {
+              key: 'engage',
+              label: '参与度与可用性',
+              children: (
+                <Row gutter={[20, 20]}>
+                  <Col xs={24} lg={12}>
+                    <b style={{ fontSize: 13 }}>各页面平均停留</b>
+                    <Table
+                      size="small"
+                      rowKey="path"
+                      style={{ marginTop: 10 }}
+                      pagination={false}
+                      dataSource={ov?.engagement.dwellByPage ?? []}
+                      columns={[
+                        { title: '页面', dataIndex: 'path', ellipsis: true },
+                        { title: '平均停留', dataIndex: 'avgSec', width: 100, render: (v: number) => `${v} 秒` },
+                        { title: '样本', dataIndex: 'views', width: 70 },
+                      ]}
+                    />
+                  </Col>
+                  <Col xs={24} lg={12}>
+                    <b style={{ fontSize: 13 }}>退出页 Top（用户从这里离开站点）</b>
+                    <Table
+                      size="small"
+                      rowKey="path"
+                      style={{ marginTop: 10 }}
+                      pagination={false}
+                      dataSource={ov?.engagement.exitPages ?? []}
+                      columns={[
+                        { title: '页面', dataIndex: 'path', ellipsis: true },
+                        { title: '退出次数', dataIndex: 'count', width: 90 },
+                      ]}
+                    />
+                  </Col>
+
+                  <Col xs={24} lg={8}>
+                    <b style={{ fontSize: 13 }}>滚动深度分布</b>
+                    <div style={{ marginTop: 12 }}>
+                      {(ov?.engagement.scrollDist ?? []).map((s) => {
+                        const max = Math.max(1, ...(ov?.engagement.scrollDist ?? []).map((x) => x.count));
+                        return (
+                          <div key={s.depth} style={{ marginBottom: 10 }}>
+                            <div style={{ fontSize: 12.5, display: 'flex', justifyContent: 'space-between' }}>
+                              <span>滚动到 {s.depth}%</span>
+                              <b>{s.count}</b>
+                            </div>
+                            <Progress percent={Math.round((s.count / max) * 100)} showInfo={false} size="small" />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Col>
+
+                  <Col xs={24} lg={8}>
+                    <b style={{ fontSize: 13 }}>搜索词 Top</b>
+                    <Table
+                      size="small"
+                      rowKey="term"
+                      style={{ marginTop: 10 }}
+                      pagination={false}
+                      locale={{ emptyText: '暂无搜索' }}
+                      dataSource={ov?.searchTerms ?? []}
+                      columns={[
+                        { title: '关键词', dataIndex: 'term' },
+                        { title: '次数', dataIndex: 'count', width: 70 },
+                      ]}
+                    />
+                  </Col>
+
+                  <Col xs={24} lg={8}>
+                    <b style={{ fontSize: 13 }}>登录 / 注册来源</b>
+                    <Table
+                      size="small"
+                      rowKey="method"
+                      style={{ marginTop: 10 }}
+                      pagination={false}
+                      dataSource={ov?.authSources ?? []}
+                      columns={[
+                        {
+                          title: '方式',
+                          dataIndex: 'method',
+                          render: (m: string) => (
+                            <Tag color={m === 'password' ? 'default' : 'blue'}>
+                              {m === 'password' ? '邮箱密码' : m}
+                            </Tag>
+                          ),
+                        },
+                        { title: '登录', dataIndex: 'logins', width: 60 },
+                        { title: '注册', dataIndex: 'signups', width: 60 },
+                      ]}
+                    />
+                  </Col>
+
+                  <Col xs={24} lg={12}>
+                    <b style={{ fontSize: 13, color: '#dc2626' }}>前端异常 Top</b>
+                    <Table
+                      size="small"
+                      rowKey="message"
+                      style={{ marginTop: 10 }}
+                      pagination={false}
+                      locale={{ emptyText: '无异常，很好' }}
+                      dataSource={ov?.errors ?? []}
+                      columns={[
+                        { title: '错误信息', dataIndex: 'message', ellipsis: true },
+                        { title: '页面', dataIndex: 'path', width: 130, ellipsis: true },
+                        { title: '次数', dataIndex: 'count', width: 70 },
+                      ]}
+                    />
+                  </Col>
+                  <Col xs={24} lg={12}>
+                    <b style={{ fontSize: 13, color: '#ea580c' }}>暴力点击（点了没反应的地方）</b>
+                    <Table
+                      size="small"
+                      rowKey="where"
+                      style={{ marginTop: 10 }}
+                      pagination={false}
+                      locale={{ emptyText: '无异常点击' }}
+                      dataSource={ov?.rageClicks ?? []}
+                      columns={[
+                        { title: '位置', dataIndex: 'where', ellipsis: true },
+                        { title: '次数', dataIndex: 'count', width: 70 },
+                      ]}
+                    />
+                  </Col>
+                </Row>
+              ),
+            },
+            {
               key: 'events',
               label: '事件流（原始记录）',
               children: (
@@ -280,7 +432,7 @@ export default function Analytics() {
                         width: 190,
                         render: (_: any, r: any) =>
                           r.userId ? (
-                            <a onClick={() => openTrail(r.userId)}>{r.userEmail}</a>
+                            <a onClick={() => setTrailId(r.userId)}>{r.userEmail}</a>
                           ) : (
                             <span style={{ color: '#999' }}>匿名 {String(r.anonId).slice(0, 6)}</span>
                           ),
@@ -303,52 +455,8 @@ export default function Analytics() {
         />
       </Card>
 
-      {/* 单用户行为轨迹 */}
-      <Drawer
-        title={trailUser?.user ? `用户行为轨迹 — ${trailUser.user.email}` : '用户轨迹'}
-        width={560}
-        open={!!trailUser}
-        onClose={() => setTrailUser(null)}
-      >
-        {trailUser && (
-          <>
-            <Card size="small" style={{ marginBottom: 14 }}>
-              <Row gutter={10}>
-                <Col span={8}><Statistic title="事件数" value={trailUser.stats.events} /></Col>
-                <Col span={8}><Statistic title="余额" value={trailUser.user?.balance ?? 0} prefix="$" /></Col>
-                <Col span={8}><Statistic title="成长值" value={trailUser.user?.growthUsd ?? 0} prefix="$" /></Col>
-              </Row>
-              <div style={{ marginTop: 10, fontSize: 12.5, color: '#888' }}>
-                首次：{trailUser.stats.firstSeen ? new Date(trailUser.stats.firstSeen).toLocaleString('zh-CN') : '-'} ·
-                最近：{trailUser.stats.lastSeen ? new Date(trailUser.stats.lastSeen).toLocaleString('zh-CN') : '-'}
-              </div>
-              <div style={{ marginTop: 8 }}>
-                {(trailUser.stats.byName ?? []).map((b: any) => (
-                  <Tag key={b.name}>{label(b.name)} × {b.count}</Tag>
-                ))}
-              </div>
-            </Card>
-            <Timeline
-              items={(trailUser.trail ?? []).map((e: any) => ({
-                color:
-                  e.name === 'payment_success' ? 'green'
-                  : e.name === 'payment_fail' ? 'red'
-                  : e.name.startsWith('checkout') ? 'blue' : 'gray',
-                children: (
-                  <div style={{ fontSize: 12.5 }}>
-                    <b>{label(e.name)}</b>{' '}
-                    <span style={{ color: '#999' }}>{new Date(e.createdAt).toLocaleString('zh-CN')}</span>
-                    <div style={{ color: '#666' }}>{e.path}</div>
-                    {Object.keys(e.props || {}).length > 0 && (
-                      <code style={{ fontSize: 11, color: '#888' }}>{JSON.stringify(e.props)}</code>
-                    )}
-                  </div>
-                ),
-              }))}
-            />
-          </>
-        )}
-      </Drawer>
+      {/* 单用户行为轨迹（与用户管理共用同一组件） */}
+      <UserTrail userId={trailId} onClose={() => setTrailId(null)} />
     </div>
   );
 }

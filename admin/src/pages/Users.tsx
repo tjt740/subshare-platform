@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Card, Modal, Popconfirm, Select, Table, Tag, message } from 'antd';
 import { api } from '../api';
+import UserTrail from '../components/UserTrail';
 
 interface UserRow {
   id: number;
@@ -22,6 +23,7 @@ const LV_NAME: Record<number, string> = { 1: '新星', 2: '白银', 3: '黄金',
 
 export default function Users() {
   const [rows, setRows] = useState<UserRow[]>([]);
+  const [trailId, setTrailId] = useState<number | null>(null);
   const [lvUser, setLvUser] = useState<UserRow | null>(null);
   const [lvValue, setLvValue] = useState<string>('auto');
   const [loading, setLoading] = useState(false);
@@ -65,6 +67,8 @@ export default function Users() {
 
   return (
     <Card title="用户管理">
+      {/* 行为轨迹抽屉：从表格「查看行为」进入 */}
+      <UserTrail userId={trailId} onClose={() => setTrailId(null)} />
       <Table
         rowKey="id"
         loading={loading}
@@ -76,7 +80,7 @@ export default function Users() {
             dataIndex: 'email',
             render: (email: string, r: UserRow) => (
               <span>
-                {r.avatar ?? '😀'} {r.nickname ? `${r.nickname} · ` : ''}
+                {r.nickname ? `${r.nickname} · ` : ''}
                 {email}
               </span>
             ),
@@ -122,10 +126,13 @@ export default function Users() {
           },
           {
             title: '操作',
-            width: 120,
+            width: 220,
             render: (_, row: UserRow) =>
               row.role === 'admin' ? null : (
                 <span style={{ display: 'inline-flex', gap: 6 }}>
+                <Button size="small" onClick={() => setTrailId(row.id)}>
+                  查看行为
+                </Button>
                 <Button
                   size="small"
                   onClick={() => {

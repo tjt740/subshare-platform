@@ -39,6 +39,8 @@ interface AppState {
   setRegion: (r: string) => void;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
+  /** 第三方登录回调：直接注入后端签发的 JWT 并拉取用户资料 */
+  applyToken: (token: string) => Promise<void>;
   logout: () => void;
   refreshUser: () => void;
   // 购物车
@@ -149,6 +151,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     );
   }, []);
 
+  /** OAuth 回调用：token 由后端签发，落库后拉一次 /auth/me */
+  const applyToken = useCallback(async (t: string) => {
+    localStorage.setItem('ss_token', t);
+    setToken(t);
+    const profile = await api<Profile>('/auth/me', { token: t });
+    setUser(profile);
+  }, []);
+
   const logout = useCallback(() => {
     localStorage.removeItem('ss_token');
     setToken(null);
@@ -185,10 +195,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo(
     () => ({
       siteCfg,
-      token, user, region, setRegion, login, register, logout, refreshUser,
+      token, user, region, setRegion, login, register, applyToken, logout, refreshUser,
       cart, addToCart, removeFromCart, clearCart,
     }),
-    [siteCfg, token, user, region, setRegion, login, register, logout, refreshUser, cart, addToCart, removeFromCart, clearCart],
+    [siteCfg, token, user, region, setRegion, login, register, applyToken, logout, refreshUser, cart, addToCart, removeFromCart, clearCart],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

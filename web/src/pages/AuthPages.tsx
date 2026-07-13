@@ -3,6 +3,8 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
 import { track } from '../track';
+import Icon from '../components/Icon';
+import OAuthButtons from '../components/OAuthButtons';
 
 function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const { login, register } = useApp();
@@ -27,10 +29,10 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
     try {
       if (mode === 'login') {
         await login(email, password);
-        track('login', { email });
+        track('login', { email, method: 'password' });
       } else {
         await register(email, password);
-        track('signup', { email });
+        track('signup', { email, method: 'password' });
       }
       navigate(location.state?.from || '/');
     } catch (err: any) {
@@ -77,7 +79,7 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
               aria-label={showPwd ? '隐藏密码' : '显示密码'}
               onClick={() => setShowPwd((s) => !s)}
             >
-              {showPwd ? '🙈' : '👁'}
+              <Icon name={showPwd ? 'eyeOff' : 'eye'} size={16} />
             </button>
           </div>
           {mode === 'register' && password.length > 0 && (
@@ -107,6 +109,7 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           {submitting ? '请稍候…' : mode === 'login' ? '登录' : '注册并登录'}
         </button>
       </form>
+      <OAuthButtons next={location.state?.from || '/'} />
       {mode === 'login' && (
         <p className="auth-switch">
           <Link to="/forgot">{t2('auth.forgot')}</Link>

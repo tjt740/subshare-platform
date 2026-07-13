@@ -18,6 +18,7 @@ import Pay from './pages/Pay';
 import Account from './pages/Account';
 import Legal from './pages/Legal';
 import Forgot from './pages/Forgot';
+import OAuthCallback from './pages/OAuthCallback';
 import Avatar from './components/Avatar';
 import Icon from './components/Icon';
 import Onboarding, { openOnboarding } from './components/Onboarding';
@@ -228,10 +229,52 @@ function MobileTabbar() {
   );
 }
 
+/** 媒体查询 hook（用于移动端折叠页脚） */
+function useMedia(query: string) {
+  const [match, setMatch] = React.useState(
+    () => typeof window !== 'undefined' && window.matchMedia(query).matches,
+  );
+  React.useEffect(() => {
+    const mq = window.matchMedia(query);
+    const on = () => setMatch(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, [query]);
+  return match;
+}
+
+/**
+ * 页脚分栏：桌面端保持四栏平铺；
+ * 移动端折叠成手风琴（默认收起，只留一行标题），大幅压缩底部占位
+ */
+function FootCol({
+  title,
+  mobile,
+  children,
+}: {
+  title: string;
+  mobile: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <details className="foot-col" open={!mobile}>
+      <summary>
+        <h4>{title}</h4>
+        <span className="foot-caret" aria-hidden>
+          <Icon name="chevron-down" size={15} />
+        </span>
+      </summary>
+      <div className="foot-body">{children}</div>
+    </details>
+  );
+}
+
 function Footer() {
   const { t } = useI18n();
   const { siteCfg } = useApp();
   const f = siteCfg?.footer ?? {};
+  const mobile = useMedia('(max-width: 760px)');
+
   return (
     <footer className="site-footer">
       <div className="footer-mega">SubShare✺</div>
@@ -241,33 +284,30 @@ function Footer() {
         reverse
       />
       <div className="container footer-inner">
-        <div>
-          <h4>{t('footer.about')}</h4>
+        <FootCol title={t('footer.about')} mobile={mobile}>
           <p>{sc(f.aboutP1, t('footer.aboutP1'))}</p>
           <p>{sc(f.aboutP2, t('footer.aboutP2'))}</p>
-        </div>
-        <div>
-          <h4>{t('footer.help')}</h4>
+        </FootCol>
+        <FootCol title={t('footer.help')} mobile={mobile}>
           <a href="#" onClick={(e) => { e.preventDefault(); openOnboarding(); }}>新手引导</a>
           <Link to="/account">{t('footer.mySubs')}</Link>
           <Link to="/account?tab=orders">{t('footer.orderQuery')}</Link>
           <Link to="/account?tab=wallet">{t('footer.recharge')}</Link>
-        </div>
-        <div>
-          <h4>条款与政策</h4>
+        </FootCol>
+        <FootCol title="条款与政策" mobile={mobile}>
           <Link to="/legal/terms">{t('legal.terms')}</Link>
           <Link to="/legal/privacy">{t('legal.privacy')}</Link>
           <Link to="/legal/refund">{t('legal.refund')}</Link>
           <Link to="/legal/about">{t('legal.about')}</Link>
-        </div>
-        <div>
-          <h4>{t('footer.guarantee')}</h4>
+        </FootCol>
+        <FootCol title={t('footer.guarantee')} mobile={mobile}>
           <p>{sc(f.g1, t('footer.g1'))}</p>
           <p>{sc(f.g2, t('footer.g2'))}</p>
           <p>{sc(f.g3, t('footer.g3'))}</p>
-        </div>
+        </FootCol>
       </div>
-      <div className="container">
+      {/* 时钟在移动端隐藏（CSS 控制），避免底部堆高 */}
+      <div className="container footer-clock">
         <StatusClock />
       </div>
       <div className="footer-copy">{t('footer.copy')}</div>
@@ -314,6 +354,7 @@ export default function App() {
             <Route path="/pay/:paymentId" element={<Pay />} />
             <Route path="/account" element={<Account />} />
             <Route path="/forgot" element={<Forgot />} />
+            <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/legal/:kind" element={<Legal />} />
           </Routes>
         </div>
