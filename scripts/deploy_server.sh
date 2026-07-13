@@ -23,6 +23,22 @@ sudo_cmd() {
   fi
 }
 
+wait_for_url() {
+  local url="$1"
+  local attempts="${2:-30}"
+  local attempt
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    if curl --fail --silent --max-time 3 "$url" >/dev/null; then
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "Health check failed after $attempts attempts: $url" >&2
+  curl --fail --silent --show-error --max-time 3 "$url" >/dev/null
+}
+
 install_packages() {
   if command -v nginx >/dev/null 2>&1 &&
     command -v node >/dev/null 2>&1 &&
@@ -158,9 +174,7 @@ if command -v firewall-cmd >/dev/null 2>&1 && sudo_cmd firewall-cmd --state >/de
   sudo_cmd firewall-cmd --reload
 fi
 
-curl --fail --silent --show-error --retry 10 --retry-delay 1 \
-  "http://127.0.0.1:$API_PORT/api/health" >/dev/null
-curl --fail --silent --show-error --retry 5 --retry-delay 1 \
-  "http://127.0.0.1:$PUBLIC_PORT/api/health" >/dev/null
+wait_for_url "http://127.0.0.1:$API_PORT/api/health" 30
+wait_for_url "http://127.0.0.1:$PUBLIC_PORT/api/health" 10
 
 echo "Deployed $APP_NAME: public=$PUBLIC_PORT api=127.0.0.1:$API_PORT"
