@@ -13,6 +13,19 @@ interface TicketRow {
   status: string;
   category?: string;
   updatedAt: string;
+  messageCount?: number;
+  rating?: number | null;
+  agent?: SupportAgent | null;
+}
+
+interface SupportAgent {
+  id: number;
+  name: string;
+  avatar: string;
+  title: string;
+  activeTickets?: number;
+  avgRating?: number | null;
+  ratingCount?: number;
 }
 
 /* ---------- 值班客服（人格化：轮班制，增强真人在线感） ---------- */
@@ -32,9 +45,6 @@ export function onDutyAgent(offset = 0) {
   const agent = AGENTS[(day + shiftIdx + offset) % AGENTS.length];
   return { agent, shiftIdx };
 }
-/** 每张工单固定跟进客服（可信的一致性） */
-const agentForTicket = (ticketId: number) => AGENTS[ticketId % AGENTS.length];
-
 const CATEGORY_KEYS: Record<string, string> = {
   general: 'cs.cat.general',
   aftersales_reissue: 'cs.cat.reissue',
@@ -43,7 +53,24 @@ const CATEGORY_KEYS: Record<string, string> = {
 };
 interface TicketDetail extends TicketRow {
   orderNo: string | null;
-  messages: { id: number; senderRole: string; content: string; createdAt: string }[];
+  resolutionNote?: string;
+  transferCount?: number;
+  ratingComment?: string;
+  messages: {
+    id: number;
+    senderRole: 'user' | 'admin' | 'system';
+    senderName?: string;
+    messageType?: string;
+    content: string;
+    createdAt: string;
+  }[];
+  transfers?: {
+    id: number;
+    fromAgentName: string;
+    toAgentName: string;
+    reason: string;
+    createdAt: string;
+  }[];
 }
 interface OrderOpt {
   id: number;
@@ -60,6 +87,7 @@ export default function SupportWidget() {
   const [view, setView] = useState<'list' | 'new' | 'thread'>('list');
   const [tickets, setTickets] = useState<TicketRow[]>([]);
   const [current, setCurrent] = useState<TicketDetail | null>(null);
+  const [agents, setAgents] = useState<SupportAgent[]>([]);
   const [orders, setOrders] = useState<OrderOpt[]>([]);
   // 新工单
   const [subject, setSubject] = useState('');
@@ -67,8 +95,15 @@ export default function SupportWidget() {
   const [orderId, setOrderId] = useState<number | ''>('');
   const [category, setCategory] = useState('general');
   const [subscriptionId, setSubscriptionId] = useState<number | undefined>();
+  const [preferredAgentId, setPreferredAgentId] = useState<number | ''>('');
   // 回复
   const [reply, setReply] = useState('');
+  const [transferAgentId, setTransferAgentId] = useState<number | ''>('');
+  const [transferReason, setTransferReason] = useState('');
+  const [showTransfer, setShowTransfer] = useState(false);
+  const [rating, setRating] = useState(5);
+  const [ratingComment, setRatingComment] = useState('');
+  const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
 
@@ -81,6 +116,9 @@ export default function SupportWidget() {
     if (open) {
       loadList();
       if (token) {
+        api<SupportAgent[]>('/support/agents', { token })
+          .then(setAgents)
+          .catch(() => undefined);
         api<OrderOpt[]>('/me/orders', { token })
           .then((os: any[]) => setOrders(os.slice(0, 10)))
           .catch(() => undefined);
@@ -100,6 +138,7 @@ export default function SupportWidget() {
       setOrderId(d.orderId ?? '');
       setCategory(d.category ?? 'general');
       setSubscriptionId(d.subscriptionId);
+      setPreferredAgentId('');
     };
     window.addEventListener('ss-support', handler);
     return () => window.removeEventListener('ss-support', handler);
@@ -123,12 +162,17 @@ export default function SupportWidget() {
   async function openTicket(id: number) {
     const detail = await api<TicketDetail>(`/tickets/${id}`, { token });
     setCurrent(detail);
+    setError('');
+    setShowTransfer(false);
+    setTransferAgentId('');
+    setTransferReason('');
     setView('thread');
   }
 
   async function createTicket() {
     if (!subject.trim() || !content.trim()) return;
     setBusy(true);
+    setError('');
     try {
       const t = await api<{ id: number }>('/tickets', {
         method: 'POST',
@@ -139,6 +183,7 @@ export default function SupportWidget() {
           category,
           ...(orderId ? { orderId } : {}),
           ...(subscriptionId ? { subscriptionId } : {}),
+          ...(preferredAgentId ? { preferredAgentId } : {}),
         }),
       });
       setSubject('');
@@ -146,8 +191,11 @@ export default function SupportWidget() {
       setOrderId('');
       setCategory('general');
       setSubscriptionId(undefined);
+      setPreferredAgentId('');
       await openTicket(t.id);
       loadList();
+    } catch (e: any) {
+      setError(e.message || '提交失败，请稍后重试');
     } finally {
       setBusy(false);
     }
@@ -156,6 +204,7 @@ export default function SupportWidget() {
   async function sendReply() {
     if (!current || !reply.trim()) return;
     setBusy(true);
+    setError('');
     try {
       const updated = await api<TicketDetail>(`/tickets/${current.id}/messages`, {
         method: 'POST',
@@ -164,6 +213,9 @@ export default function SupportWidget() {
       });
       setCurrent(updated);
       setReply('');
+      loadList();
+    } catch (e: any) {
+      setError(e.message || '发送失败，请重试');
     } finally {
       setBusy(false);
     }
@@ -171,9 +223,65 @@ export default function SupportWidget() {
 
   async function closeTicket() {
     if (!current) return;
-    await api(`/tickets/${current.id}/close`, { method: 'POST', token });
-    await openTicket(current.id);
-    loadList();
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await api<TicketDetail>(`/tickets/${current.id}/close`, {
+        method: 'POST',
+        token,
+      });
+      setCurrent(updated);
+      loadList();
+    } catch (e: any) {
+      setError(e.message || '操作失败，请重试');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function transferTicket() {
+    if (!current || !transferAgentId) return;
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await api<TicketDetail>(`/tickets/${current.id}/transfer`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({
+          agentId: transferAgentId,
+          reason: transferReason.trim() || '用户希望更换客服',
+        }),
+      });
+      setCurrent(updated);
+      setShowTransfer(false);
+      setTransferAgentId('');
+      setTransferReason('');
+      loadList();
+    } catch (e: any) {
+      setError(e.message || '切换客服失败');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submitRating() {
+    if (!current) return;
+    setBusy(true);
+    setError('');
+    try {
+      const updated = await api<TicketDetail>(`/tickets/${current.id}/rating`, {
+        method: 'POST',
+        token,
+        body: JSON.stringify({ rating, comment: ratingComment.trim() }),
+      });
+      setCurrent(updated);
+      setRatingComment('');
+      loadList();
+    } catch (e: any) {
+      setError(e.message || '评价提交失败');
+    } finally {
+      setBusy(false);
+    }
   }
 
   const { agent: duty, shiftIdx } = onDutyAgent();
@@ -193,7 +301,9 @@ export default function SupportWidget() {
     );
   }
 
-  const threadAgent = current ? agentForTicket(current.id) : duty;
+  const threadAgent = current?.agent || duty;
+  const threadAgentAvatar =
+    'avatar' in threadAgent ? threadAgent.avatar : threadAgent.emoji;
 
   return (
     <>
@@ -242,7 +352,7 @@ export default function SupportWidget() {
           {view === 'thread' && current && (
             <div className="cs-agent" style={{ marginTop: 6 }}>
               <span className="cs-avatar">
-                <Avatar value={threadAgent.emoji} size={38} />
+                <Avatar value={threadAgentAvatar} size={38} />
                 <i className="cs-online"><OnlinePulse size={14} /></i>
               </span>
               <div>
@@ -255,6 +365,12 @@ export default function SupportWidget() {
             </div>
           )}
         </div>
+
+        {error && (
+          <div className="alert alert-error" style={{ margin: '8px 12px 0' }}>
+            {error}
+          </div>
+        )}
 
         {/* 未登录 */}
         {!token && (
@@ -358,6 +474,25 @@ export default function SupportWidget() {
               </select>
             </label>
             <label className="field">
+              <span>选择客服（可选）</span>
+              <select
+                className="region-select"
+                style={{ width: '100%' }}
+                value={preferredAgentId}
+                onChange={(e) =>
+                  setPreferredAgentId(e.target.value ? Number(e.target.value) : '')
+                }
+              >
+                <option value="">系统自动分配</option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.name} · {agent.title}
+                    {agent.avgRating ? ` · ${agent.avgRating} 分` : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="field">
               <span>{t('cs.desc')}</span>
               <textarea
                 rows={4}
@@ -389,17 +524,71 @@ export default function SupportWidget() {
         {token && view === 'thread' && current && (
           <>
             <div className="cs-body" ref={bodyRef}>
-              {current.messages.map((m) => (
-                <div className={`msg ${m.senderRole}`} key={m.id}>
-                  <div className="bubble">{m.content}</div>
-                  <div className="m-time">
-                    {m.senderRole === 'admin'
-                      ? `${threadAgent.name} · ${t('cs.official')} · `
-                      : ''}
-                    {fmtTime(m.createdAt)}
-                  </div>
+              <div className="cs-thread-tools">
+                <span>
+                  当前客服：<b>{current.agent?.name || '待分配'}</b>
+                  {current.transferCount ? ` · 已转接 ${current.transferCount} 次` : ''}
+                </span>
+                {current.status !== 'closed' && agents.length > 0 && (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => setShowTransfer((v) => !v)}
+                  >
+                    切换客服
+                  </button>
+                )}
+              </div>
+              {showTransfer && (
+                <div className="cs-transfer-box">
+                  <b>切换客服（完整聊天记录不会丢失）</b>
+                  <select
+                    value={transferAgentId}
+                    onChange={(e) =>
+                      setTransferAgentId(e.target.value ? Number(e.target.value) : '')
+                    }
+                  >
+                    <option value="">请选择新客服</option>
+                    {agents
+                      .filter((agent) => agent.id !== current.agent?.id)
+                      .map((agent) => (
+                        <option key={agent.id} value={agent.id}>
+                          {agent.name} · {agent.title}
+                        </option>
+                      ))}
+                  </select>
+                  <input
+                    value={transferReason}
+                    onChange={(e) => setTransferReason(e.target.value)}
+                    placeholder="切换原因（可选）"
+                    maxLength={200}
+                  />
+                  <button
+                    className="btn btn-primary btn-sm"
+                    disabled={busy || !transferAgentId}
+                    onClick={transferTicket}
+                  >
+                    确认切换
+                  </button>
                 </div>
-              ))}
+              )}
+              {current.messages.map((m) =>
+                m.senderRole === 'system' ? (
+                  <div className="cs-system-message" key={m.id}>
+                    <span>{m.content}</span>
+                    <small>{fmtTime(m.createdAt)}</small>
+                  </div>
+                ) : (
+                  <div className={`msg ${m.senderRole}`} key={m.id}>
+                    <div className="bubble">{m.content}</div>
+                    <div className="m-time">
+                      {m.senderRole === 'admin'
+                        ? `${m.senderName || threadAgent.name} · ${t('cs.official')} · `
+                        : ''}
+                      {fmtTime(m.createdAt)}
+                    </div>
+                  </div>
+                ),
+              )}
               {current.status === 'open' && (
                 <div className="msg admin">
                   <div className="bubble typing">
@@ -413,6 +602,41 @@ export default function SupportWidget() {
               {current.status === 'closed' && (
                 <div className="empty" style={{ padding: '14px 0', fontSize: 12.5 }}>
                   {t('cs.closedLine')}
+                  {current.rating ? ` · 已评价 ${current.rating} 星` : ' · 未评价'}
+                </div>
+              )}
+              {current.status === 'resolved' && !current.rating && (
+                <div className="cs-rating-box">
+                  <b>客服已标记问题解决</b>
+                  <p>{current.resolutionNote || '请确认问题是否已经解决。评价为可选项。'}</p>
+                  <div className="cs-stars" aria-label="客服评分">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <button
+                        key={star}
+                        className={star <= rating ? 'active' : ''}
+                        onClick={() => setRating(star)}
+                        aria-label={`${star} 星`}
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+                  <textarea
+                    rows={2}
+                    value={ratingComment}
+                    onChange={(e) => setRatingComment(e.target.value)}
+                    placeholder="评价内容（可选）"
+                    maxLength={500}
+                  />
+                  <div className="cs-rating-actions">
+                    <button className="btn btn-ghost btn-sm" disabled={busy} onClick={closeTicket}>
+                      已解决，暂不评价
+                    </button>
+                    <button className="btn btn-primary btn-sm" disabled={busy} onClick={submitRating}>
+                      提交评价并完成
+                    </button>
+                  </div>
+                  <small>如果问题仍未解决，可直接在下方继续回复，工单会自动重新打开。</small>
                 </div>
               )}
             </div>
@@ -422,13 +646,15 @@ export default function SupportWidget() {
                   placeholder={t('cs.replyPh')}
                   value={reply}
                   onChange={(e) => setReply(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && sendReply()}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+                      e.preventDefault();
+                      if (!busy && reply.trim()) void sendReply();
+                    }
+                  }}
                 />
                 <button className="btn btn-primary btn-sm" disabled={busy || !reply.trim()} onClick={sendReply}>
                   {t('cs.send')}
-                </button>
-                <button className="btn btn-ghost btn-sm" onClick={closeTicket} title="关闭工单">
-                  ✓
                 </button>
               </div>
             )}

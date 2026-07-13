@@ -15,6 +15,7 @@ import {
   Subscription,
 } from '../entities';
 import { CatalogService } from '../catalog/catalog.service';
+import { FulfillmentService } from '../payments/fulfillment.service';
 
 @Injectable()
 export class OrdersService {
@@ -27,6 +28,7 @@ export class OrdersService {
     @InjectRepository(Subscription)
     private readonly subs: Repository<Subscription>,
     private readonly catalog: CatalogService,
+    private readonly fulfillment: FulfillmentService,
   ) {}
 
   /**
@@ -162,18 +164,26 @@ export class OrdersService {
     return this.decorate(orders);
   }
 
+  /** 用户取消未支付订单 */
+  async cancelMine(userId: number, orderId: number) {
+    const order = await this.orders.findOneBy({ id: orderId, userId });
+    if (!order) throw new NotFoundException('订单不存在');
+    if (order.status !== 'created') {
+      throw new BadRequestException('仅未支付订单可取消');
+    }
+    order.status = 'canceled';
+    order.paymentStatus = 'canceled';
+    await this.orders.save(order);
+    return { ok: true, id: order.id, status: order.status };
+  }
+
   async listMySubscriptions(userId: number) {
+    // 惰性到期回收：置 expired 并释放坑位回池（复用交付引擎的加锁实现）
+    await this.fulfillment.sweepExpired();
     const subs = await this.subs.find({
       where: { userId },
       order: { id: 'DESC' },
     });
-    const now = new Date();
-    for (const s of subs) {
-      if (s.status === 'active' && new Date(s.expiresAt) < now) {
-        s.status = 'expired';
-        await this.subs.save(s);
-      }
-    }
     if (subs.length === 0) return [];
     const plans = await this.plans.findBy({
       id: In(subs.map((s) => s.planId)),

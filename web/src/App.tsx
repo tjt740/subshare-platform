@@ -24,6 +24,8 @@ import Icon from './components/Icon';
 import Onboarding, { openOnboarding } from './components/Onboarding';
 import { track, trackPageView } from './track';
 import SupportWidget from './components/SupportWidget';
+import NotifBell from './components/NotifBell';
+import SiteBackground from './components/SiteBackground';
 import {
   BootSplash,
   Cursor,
@@ -89,6 +91,7 @@ function Header() {
             <Link to="/account?tab=wallet">{t('nav.wallet')}</Link>
           </nav>
           <div className="header-right">
+            {user && <NotifBell />}
             <Link to="/cart" className="cart-btn" aria-label={`${t('tabbar.cart')}（${cart.length}）`}>
               <Icon name="cart" size={18} />
               {cart.length > 0 && <span className="cart-badge">{cart.length}</span>}
@@ -315,6 +318,23 @@ function Footer() {
   );
 }
 
+function NotFound() {
+  return (
+    <div className="empty" style={{ padding: '80px 0' }}>
+      <div style={{ fontFamily: 'var(--font-display)', fontSize: 64, lineHeight: 1, color: 'var(--red)' }}>
+        404
+      </div>
+      <p style={{ marginTop: 12, fontWeight: 700 }}>页面不存在或已失效</p>
+      <p className="muted small" style={{ marginBottom: 18 }}>
+        链接可能已过期，或你输入了错误的地址。
+      </p>
+      <Link className="btn btn-primary" to="/">
+        <Icon name="home" size={15} /> 回首页逛逛
+      </Link>
+    </div>
+  );
+}
+
 function ScrollToTop() {
   const { pathname } = useLocation();
   React.useEffect(() => {
@@ -336,6 +356,7 @@ export default function App() {
   const location = useLocation();
   return (
     <>
+      <SiteBackground />
       <BootSplash />
       <Cursor />
       <ScrollToTop />
@@ -356,6 +377,7 @@ export default function App() {
             <Route path="/forgot" element={<Forgot />} />
             <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/legal/:kind" element={<Legal />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
       </main>

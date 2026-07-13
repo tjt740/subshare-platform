@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   InventoryAccount,
+  Notification,
   Order,
   OrderItem,
   Payment,
@@ -17,6 +18,7 @@ import {
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
 import { FulfillmentService } from './fulfillment.service';
+import { MaintenanceService } from './maintenance.service';
 
 @Module({
   imports: [
@@ -33,10 +35,11 @@ import { FulfillmentService } from './fulfillment.service';
       Subscription,
       User,
       WalletTransaction,
+      Notification,
     ]),
   ],
-  providers: [PaymentsService, FulfillmentService],
+  providers: [PaymentsService, FulfillmentService, MaintenanceService],
   controllers: [PaymentsController],
-  exports: [PaymentsService, FulfillmentService],
+  exports: [PaymentsService, FulfillmentService, MaintenanceService],
 })
 export class PaymentsModule {}

@@ -14,6 +14,14 @@ export async function api<T = any>(
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
+    // 全局 401：token 失效/被吊销/封禁 → 清登录态并跳登录，而非把原始错误抛给业务页
+    if (res.status === 401) {
+      const had = localStorage.getItem('ss_token');
+      localStorage.removeItem('ss_token');
+      if (had && !location.pathname.startsWith('/login')) {
+        location.assign('/login?expired=1');
+      }
+    }
     const message = Array.isArray(data?.message)
       ? data.message[0]
       : data?.message || `请求失败 (${res.status})`;
@@ -56,6 +64,7 @@ export const ORDER_STATUS_TEXT: Record<string, string> = {
 export const TICKET_STATUS_TEXT: Record<string, string> = {
   open: '处理中',
   answered: '客服已回复',
+  resolved: '已解决·待确认',
   closed: '已关闭',
 };
 

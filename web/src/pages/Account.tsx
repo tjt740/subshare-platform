@@ -237,6 +237,16 @@ export default function Account() {
     }
   }
 
+  async function cancelOrder(order: OrderView) {
+    if (!window.confirm(`确认取消订单 ${order.orderNo}？取消后不可恢复。`)) return;
+    try {
+      await api(`/orders/${order.id}/cancel`, { method: 'POST', token });
+      load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  }
+
   async function recharge() {
     setRecharging(true);
     setError('');
@@ -487,9 +497,17 @@ export default function Account() {
                   <td>
                     <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       {o.status === 'created' && (
-                        <button className="btn btn-primary btn-sm" onClick={() => payAgain(o)}>
-                          {t('orders.pay')}
-                        </button>
+                        <>
+                          <button className="btn btn-primary btn-sm" onClick={() => payAgain(o)}>
+                            {t('orders.pay')}
+                          </button>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={() => cancelOrder(o)}
+                          >
+                            取消订单
+                          </button>
+                        </>
                       )}
                       {['paid', 'delivered', 'allocating'].includes(o.status) && (
                         <button
@@ -557,7 +575,7 @@ export default function Account() {
                     checked={provider === p.value}
                     onChange={() => setProvider(p.value)}
                   />
-                  <span className="p-icon">{p.icon}</span>
+                  <span className="p-icon"><Icon name={p.icon} size={20} /></span>
                   <span className="p-name">
                     {p.name}
                     <div className="p-desc">{p.desc}</div>

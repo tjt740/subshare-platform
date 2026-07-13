@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { JwtModule } from '@nestjs/jwt';
 import * as path from 'path';
 import { ALL_ENTITIES, SiteSetting } from './entities';
+import { CommonModule } from './common/common.module';
 import { AuthModule } from './auth/auth.module';
 import { CatalogModule } from './catalog/catalog.module';
 import { OrdersModule } from './orders/orders.module';
@@ -13,6 +14,7 @@ import { TicketsModule } from './tickets/tickets.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { MiscController } from './misc/misc.controller';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
@@ -34,6 +36,7 @@ export const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
       secret: JWT_SECRET,
       signOptions: { expiresIn: '7d' },
     }),
+    CommonModule,
     AuthModule,
     CatalogModule,
     OrdersModule,
@@ -43,6 +46,7 @@ export const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
     TicketsModule,
     SupplierModule,
     AnalyticsModule,
+    NotificationsModule,
   ],
   controllers: [MiscController],
 })

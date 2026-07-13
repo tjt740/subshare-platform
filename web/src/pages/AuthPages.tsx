@@ -11,7 +11,11 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const { t: t2 } = useI18n();
   const [showPwd, setShowPwd] = useState(false);
   const navigate = useNavigate();
-  const location = useLocation() as { state?: { from?: string } };
+  const location = useLocation() as { state?: { from?: string; notice?: string } };
+  // 会话过期跳转（api 层 401）会带 ?expired=1；重置密码成功带 state.notice
+  const expired =
+    mode === 'login' && new URLSearchParams(window.location.search).get('expired') === '1';
+  const notice = location.state?.notice || (expired ? '登录状态已过期，请重新登录' : '');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -50,6 +54,7 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
           ? '登录后管理你的订阅与订单'
           : '注册即可用更低价格享受高级订阅'}
       </p>
+      {notice && <div className="alert alert-ok" role="status">{notice}</div>}
       <form onSubmit={submit}>
         <label className="field">
           <span>邮箱</span>

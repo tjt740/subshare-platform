@@ -229,6 +229,16 @@ export class AdminController {
   listTickets(@Query('status') status?: string) {
     return this.admin.listTickets(status || undefined);
   }
+  @Get('tickets-stats')
+  @Perm('tickets')
+  ticketStats() {
+    return this.admin.ticketStats();
+  }
+  @Get('support-agents')
+  @Perm('tickets')
+  supportAgents() {
+    return this.admin.listSupportAgents();
+  }
   @Get('tickets/:id')
   @Perm('tickets')
   getTicket(@Param('id', ParseIntPipe) id: number) {
@@ -239,13 +249,30 @@ export class AdminController {
   replyTicket(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { content: string },
+    @CurrentUser() user: JwtUser,
   ) {
-    return this.admin.replyTicket(id, body.content || '');
+    return this.admin.replyTicket(id, body.content || '', user.sub);
   }
   @Post('tickets/:id/close')
   @Perm('tickets')
-  closeTicket(@Param('id', ParseIntPipe) id: number) {
-    return this.admin.closeTicket(id);
+  closeTicket(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { resolutionNote?: string },
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.admin.resolveTicket(id, user.sub, body.resolutionNote);
+  }
+  @Post('tickets/:id/transfer')
+  @Perm('tickets')
+  transferTicket(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() body: { agentId: number; reason: string },
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.admin.transferTicket(id, Number(body.agentId), body.reason || '', {
+      sub: user.sub,
+      role: user.role as 'admin' | 'super',
+    });
   }
   /** 一键售后动作：reissue 补发 / refund 退款 */
   @Post('tickets/:id/action')
@@ -253,8 +280,9 @@ export class AdminController {
   ticketAction(
     @Param('id', ParseIntPipe) id: number,
     @Body() body: { action: 'reissue' | 'refund' },
+    @CurrentUser() user: JwtUser,
   ) {
-    return this.admin.ticketAction(id, body.action);
+    return this.admin.ticketAction(id, body.action, user.sub);
   }
 
   // ---------- 供应商审核 ----------

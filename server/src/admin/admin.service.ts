@@ -27,6 +27,7 @@ import {
   SupplierSubmission,
   Ticket,
   TicketMessage,
+  TicketTransfer,
   toUsd,
   User,
   WalletTransaction,
@@ -36,6 +37,17 @@ import { OrdersService } from '../orders/orders.service';
 
 const money = (n: number) => Math.round((Number(n) || 0) * 100) / 100;
 const DAY_MS = 86_400_000;
+const supportName = (user?: User | null) =>
+  user?.nickname?.trim() || user?.email?.split('@')[0] || '客服';
+const canHandleTickets = (user: User) => {
+  if (user.role === 'super') return true;
+  if (user.role !== 'admin') return false;
+  try {
+    return (JSON.parse(user.permissions || '[]') as string[]).includes('tickets');
+  } catch {
+    return false;
+  }
+};
 const ratioAt = (start: Date | null, end: Date | null, asOf: Date) => {
   if (!start || !end) return 1;
   const from = new Date(start).getTime();
@@ -69,6 +81,8 @@ export class AdminService {
     @InjectRepository(Ticket) private readonly tickets: Repository<Ticket>,
     @InjectRepository(TicketMessage)
     private readonly ticketMessages: Repository<TicketMessage>,
+    @InjectRepository(TicketTransfer)
+    private readonly ticketTransfers: Repository<TicketTransfer>,
     @InjectRepository(SupplierSubmission)
     private readonly submissions: Repository<SupplierSubmission>,
     @InjectRepository(WalletTransaction)
@@ -342,7 +356,7 @@ export class AdminService {
       };
       const calculatedPrice = money(Object.values(breakdown).reduce((a, b) => a + b, 0));
       const price = calculatedPrice > 0 ? calculatedPrice : money(item.price);
-      if (price < 0) continue;
+      if (price <= 0) continue; // 拦截 0 元/负价，避免 0 元下单
       await this.prices.save(
         this.prices.create({
           planId,
@@ -734,7 +748,7 @@ export class AdminService {
     };
   }
 
-  /** 退款：回收坑位 + 吊销订阅 + 退款金额按汇率折 USD 入用户钱包 */
+  /** 退款：回收坑位 + 吊销订阅 + 退款金额入钱包，并冲回成长值（防刷等级） */
   async refundOrder(id: number) {
     const order = await this.orders.findOneBy({ id });
     if (!order) throw new NotFoundException('订单不存在');
@@ -753,13 +767,24 @@ export class AdminService {
     const user = await this.users.findOneBy({ id: order.userId });
     if (user) {
       user.balance = Math.round((user.balance + usd) * 100) / 100;
+      // 成长值冲回：仅当该订单当初「计入过成长值」时才扣回。
+      // 口径与支付一致：balance 支付不计成长值（充值时已计），故其退款不扣；
+      // 其余（mock 直付）计过成长值，退款按 USD 扣回，避免下单退款白嫖等级。
+      const succeeded = await this.payments.findOneBy({
+        orderId: order.id,
+        status: 'succeeded',
+      });
+      const countedGrowth = !!succeeded && succeeded.provider !== 'balance';
+      if (countedGrowth) {
+        user.growthUsd = Math.max(0, Math.round(((user.growthUsd ?? 0) - usd) * 100) / 100);
+      }
       await this.users.save(user);
       await this.txns.save(
         this.txns.create({
           userId: user.id,
           type: 'refund',
           amountUsd: usd,
-          note: `订单 ${order.orderNo} 退款入钱包`,
+          note: `订单 ${order.orderNo} 退款入钱包${countedGrowth ? '（已冲回成长值）' : ''}`,
         }),
       );
     }
@@ -952,6 +977,103 @@ export class AdminService {
   }
 
   // ---------- 客服工单 ----------
+  private async supportAgent(id: number) {
+    const agent = await this.users.findOneBy({ id, status: 'active' });
+    if (!agent || !canHandleTickets(agent)) {
+      throw new BadRequestException('目标客服不可用或没有工单权限');
+    }
+    return agent;
+  }
+
+  async ticketStats() {
+    const [tickets, messages, transfers, users] = await Promise.all([
+      this.tickets.find(),
+      this.ticketMessages.find(),
+      this.ticketTransfers.find(),
+      this.users.find({ where: { status: 'active' } }),
+    ]);
+    const agents = users.filter(canHandleTickets);
+    const rated = tickets.filter((t) => t.rating);
+    const firstResponses = tickets
+      .filter((t) => t.firstResponseAt)
+      .map((t) =>
+        Math.max(
+          0,
+          (new Date(t.firstResponseAt!).getTime() - new Date(t.createdAt).getTime()) /
+            60_000,
+        ),
+      );
+    return {
+      total: tickets.length,
+      open: tickets.filter((t) => t.status === 'open').length,
+      answered: tickets.filter((t) => t.status === 'answered').length,
+      resolved: tickets.filter((t) => t.status === 'resolved').length,
+      closed: tickets.filter((t) => t.status === 'closed').length,
+      messageCount: messages.filter((m) => m.messageType === 'text').length,
+      transferCount: transfers.length,
+      avgFirstResponseMinutes: firstResponses.length
+        ? Math.round(
+            (firstResponses.reduce((a, b) => a + b, 0) / firstResponses.length) *
+              10,
+          ) / 10
+        : 0,
+      ratings: {
+        total: rated.length,
+        average: rated.length
+          ? Math.round(
+              (rated.reduce((sum, t) => sum + Number(t.rating), 0) /
+                rated.length) *
+                10,
+            ) / 10
+          : 0,
+        excellent: rated.filter((t) => t.rating === 5).length,
+        medium: rated.filter((t) => Number(t.rating) >= 3 && Number(t.rating) <= 4)
+          .length,
+        bad: rated.filter((t) => Number(t.rating) <= 2).length,
+      },
+      agents: agents.map((agent) => {
+        const agentMessages = messages.filter(
+          (m) => m.senderRole === 'admin' && m.senderId === agent.id,
+        );
+        const assigned = tickets.filter((t) => t.assignedAgentId === agent.id);
+        const agentRatings = tickets.filter(
+          (t) => t.ratedAgentId === agent.id && t.rating,
+        );
+        return {
+          id: agent.id,
+          name: supportName(agent),
+          avatar: agent.avatar,
+          activeTickets: assigned.filter(
+            (t) => !['resolved', 'closed'].includes(t.status),
+          ).length,
+          handledTickets: new Set(agentMessages.map((m) => m.ticketId)).size,
+          replies: agentMessages.length,
+          transfersIn: transfers.filter((t) => t.toAgentId === agent.id).length,
+          transfersOut: transfers.filter((t) => t.fromAgentId === agent.id).length,
+          ratingCount: agentRatings.length,
+          avgRating: agentRatings.length
+            ? Math.round(
+                (agentRatings.reduce((sum, t) => sum + Number(t.rating), 0) /
+                  agentRatings.length) *
+                  10,
+              ) / 10
+            : 0,
+        };
+      }),
+    };
+  }
+
+  async listSupportAgents() {
+    const users = await this.users.find({ where: { status: 'active' } });
+    return users.filter(canHandleTickets).map((agent) => ({
+      id: agent.id,
+      name: supportName(agent),
+      email: agent.email,
+      avatar: agent.avatar,
+      role: agent.role,
+    }));
+  }
+
   async listTickets(status?: string) {
     const where = status ? { status: status as Ticket['status'] } : {};
     const rows = await this.tickets.find({
@@ -959,11 +1081,25 @@ export class AdminService {
       order: { updatedAt: 'DESC' },
       take: 200,
     });
-    const users = await this.users.findBy({
-      id: In(rows.map((t) => t.userId)),
-    });
+    const userIds = [
+      ...new Set(
+        rows.flatMap((t) => [t.userId, t.assignedAgentId]).filter(Boolean),
+      ),
+    ] as number[];
+    const users = userIds.length ? await this.users.findBy({ id: In(userIds) }) : [];
+    const messages = rows.length
+      ? await this.ticketMessages.findBy({ ticketId: In(rows.map((t) => t.id)) })
+      : [];
     const userMap = new Map(users.map((u) => [u.id, u.email]));
-    return rows.map((t) => ({ ...t, userEmail: userMap.get(t.userId) ?? '-' }));
+    const entityMap = new Map(users.map((u) => [u.id, u]));
+    return rows.map((t) => ({
+      ...t,
+      userEmail: userMap.get(t.userId) ?? '-',
+      agentName: t.assignedAgentId
+        ? supportName(entityMap.get(t.assignedAgentId))
+        : '待分配',
+      messageCount: messages.filter((m) => m.ticketId === t.id).length,
+    }));
   }
 
   async getTicket(id: number) {
@@ -978,26 +1114,156 @@ export class AdminService {
       where: { ticketId: id },
       order: { id: 'ASC' },
     });
-    return { ...ticket, userEmail: user?.email ?? '-', orderNo, messages };
+    const agent = ticket.assignedAgentId
+      ? await this.users.findOneBy({ id: ticket.assignedAgentId })
+      : null;
+    const transfers = await this.ticketTransfers.find({
+      where: { ticketId: id },
+      order: { id: 'ASC' },
+    });
+    return {
+      ...ticket,
+      userEmail: user?.email ?? '-',
+      userName: supportName(user),
+      orderNo,
+      agent: agent
+        ? { id: agent.id, name: supportName(agent), email: agent.email, avatar: agent.avatar }
+        : null,
+      messages,
+      transfers,
+    };
   }
 
-  async replyTicket(id: number, content: string) {
+  async replyTicket(id: number, content: string, operatorId: number) {
     const ticket = await this.tickets.findOneBy({ id });
     if (!ticket) throw new NotFoundException('工单不存在');
-    await this.ticketMessages.save(
-      this.ticketMessages.create({ ticketId: id, senderRole: 'admin', content }),
-    );
-    ticket.status = 'answered';
-    await this.tickets.save(ticket);
+    if (ticket.status === 'closed') throw new BadRequestException('已完成工单不能继续回复');
+    const clean = content.trim();
+    if (!clean) throw new BadRequestException('回复内容不能为空');
+    const operator = await this.supportAgent(operatorId);
+    await this.tickets.manager.transaction(async (manager) => {
+      const messageRepo = manager.getRepository(TicketMessage);
+      if (!ticket.assignedAgentId) {
+        ticket.assignedAgentId = operator.id;
+        ticket.assignedAt = new Date();
+        await messageRepo.save(
+          messageRepo.create({
+            ticketId: id,
+            senderRole: 'system',
+            senderId: null,
+            senderName: '系统',
+            messageType: 'transfer',
+            metadata: JSON.stringify({ toAgentId: operator.id }),
+            content: `客服 ${supportName(operator)} 已接待本工单，完整会话将持续保留。`,
+          }),
+        );
+      }
+      await messageRepo.save(
+        messageRepo.create({
+          ticketId: id,
+          senderRole: 'admin',
+          senderId: operator.id,
+          senderName: supportName(operator),
+          messageType: 'text',
+          metadata: '{}',
+          content: clean,
+        }),
+      );
+      ticket.status = 'answered';
+      ticket.firstResponseAt = ticket.firstResponseAt || new Date();
+      ticket.lastMessageAt = new Date();
+      ticket.resolvedAt = null;
+      ticket.resolvedBy = null;
+      ticket.resolutionNote = '';
+      await manager.getRepository(Ticket).save(ticket);
+    });
     return this.getTicket(id);
   }
 
-  async closeTicket(id: number) {
+  async resolveTicket(id: number, operatorId: number, resolutionNote = '') {
     const ticket = await this.tickets.findOneBy({ id });
     if (!ticket) throw new NotFoundException('工单不存在');
-    ticket.status = 'closed';
-    await this.tickets.save(ticket);
-    return ticket;
+    if (ticket.status === 'closed') throw new BadRequestException('工单已经完成');
+    const operator = await this.supportAgent(operatorId);
+    const cleanNote = resolutionNote.trim().slice(0, 500) || '问题已处理完成';
+    await this.tickets.manager.transaction(async (manager) => {
+      await manager.getRepository(TicketMessage).save(
+        manager.getRepository(TicketMessage).create({
+          ticketId: id,
+          senderRole: 'system',
+          senderId: operator.id,
+          senderName: supportName(operator),
+          messageType: 'resolution',
+          metadata: JSON.stringify({ resolvedBy: operator.id }),
+          content: `客服 ${supportName(operator)} 已标记问题解决：${cleanNote}。请用户确认并可选评价本次服务。`,
+        }),
+      );
+      ticket.status = 'resolved';
+      ticket.resolvedAt = new Date();
+      ticket.resolvedBy = operator.id;
+      ticket.resolutionNote = cleanNote;
+      ticket.lastMessageAt = new Date();
+      await manager.getRepository(Ticket).save(ticket);
+    });
+    return this.getTicket(id);
+  }
+
+  async transferTicket(
+    id: number,
+    toAgentId: number,
+    reason: string,
+    operator: { sub: number; role: 'admin' | 'super' },
+  ) {
+    const ticket = await this.tickets.findOneBy({ id });
+    if (!ticket) throw new NotFoundException('工单不存在');
+    if (ticket.status === 'closed') throw new BadRequestException('已完成工单不能转接');
+    const cleanReason = reason.trim().slice(0, 200);
+    if (!cleanReason) throw new BadRequestException('请填写转接理由');
+    if (ticket.assignedAgentId === toAgentId) {
+      throw new BadRequestException('目标客服与当前客服相同');
+    }
+    const [toAgent, fromAgent] = await Promise.all([
+      this.supportAgent(toAgentId),
+      ticket.assignedAgentId
+        ? this.users.findOneBy({ id: ticket.assignedAgentId })
+        : Promise.resolve(null),
+    ]);
+    await this.tickets.manager.transaction(async (manager) => {
+      await manager.getRepository(TicketTransfer).save(
+        manager.getRepository(TicketTransfer).create({
+          ticketId: id,
+          fromAgentId: fromAgent?.id ?? null,
+          fromAgentName: supportName(fromAgent),
+          toAgentId: toAgent.id,
+          toAgentName: supportName(toAgent),
+          initiatedBy: operator.sub,
+          initiatedRole: operator.role,
+          reason: cleanReason,
+        }),
+      );
+      await manager.getRepository(TicketMessage).save(
+        manager.getRepository(TicketMessage).create({
+          ticketId: id,
+          senderRole: 'system',
+          senderId: null,
+          senderName: '系统',
+          messageType: 'transfer',
+          metadata: JSON.stringify({
+            fromAgentId: fromAgent?.id ?? null,
+            toAgentId: toAgent.id,
+            reason: cleanReason,
+          }),
+          content: `工单由 ${supportName(fromAgent)} 转接给 ${supportName(toAgent)}。转接理由：${cleanReason}。历史对话与原客服信息完整保留。`,
+        }),
+      );
+      ticket.assignedAgentId = toAgent.id;
+      ticket.assignedAt = new Date();
+      ticket.transferCount += 1;
+      ticket.status = 'open';
+      ticket.lastMessageAt = new Date();
+      await manager.getRepository(Ticket).save(ticket);
+    });
+    return this.getTicket(id);
   }
 
   /**
@@ -1005,9 +1271,14 @@ export class AdminService {
    * - reissue：调交付引擎补发新坑位并自动回复
    * - refund：调订单退款（退回钱包）并自动回复
    */
-  async ticketAction(id: number, action: 'reissue' | 'refund') {
+  async ticketAction(
+    id: number,
+    action: 'reissue' | 'refund',
+    operatorId: number,
+  ) {
     const ticket = await this.tickets.findOneBy({ id });
     if (!ticket) throw new NotFoundException('工单不存在');
+    const operator = await this.supportAgent(operatorId);
 
     if (action === 'reissue') {
       let subId = ticket.subscriptionId;
@@ -1026,6 +1297,10 @@ export class AdminService {
         this.ticketMessages.create({
           ticketId: id,
           senderRole: 'admin',
+          senderId: operator.id,
+          senderName: supportName(operator),
+          messageType: 'text',
+          metadata: JSON.stringify({ action: 'reissue' }),
           content:
             '✅ 已为您补发新凭据（旧账号已作废）。请前往「我的订阅」查看最新账号密码；如仍有异常请直接回复本工单。',
         }),
@@ -1039,6 +1314,10 @@ export class AdminService {
         this.ticketMessages.create({
           ticketId: id,
           senderRole: 'admin',
+          senderId: operator.id,
+          senderName: supportName(operator),
+          messageType: 'text',
+          metadata: JSON.stringify({ action: 'refund' }),
           content:
             '✅ 订单已退款：金额已按汇率折算退回您的钱包余额，可在「钱包」页查看流水。感谢理解与支持！',
         }),
@@ -1048,6 +1327,10 @@ export class AdminService {
     }
 
     ticket.status = 'answered';
+    ticket.assignedAgentId = ticket.assignedAgentId || operator.id;
+    ticket.assignedAt = ticket.assignedAt || new Date();
+    ticket.firstResponseAt = ticket.firstResponseAt || new Date();
+    ticket.lastMessageAt = new Date();
     await this.tickets.save(ticket);
     return this.getTicket(id);
   }

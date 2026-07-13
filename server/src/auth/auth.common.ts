@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
+import { AccountStatusService } from '../common/account-status.service';
 
 export interface JwtUser {
   sub: number;
@@ -17,21 +18,30 @@ export interface JwtUser {
   permissions: string[];
 }
 
-/** Bearer Token 校验，把 payload 挂到 req.user */
+/** Bearer Token 校验，把 payload 挂到 req.user；并校验账号未被封禁/删除 */
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
-  constructor(private readonly jwt: JwtService) {}
-  canActivate(ctx: ExecutionContext): boolean {
+  constructor(
+    private readonly jwt: JwtService,
+    private readonly accounts: AccountStatusService,
+  ) {}
+  async canActivate(ctx: ExecutionContext): Promise<boolean> {
     const req = ctx.switchToHttp().getRequest();
     const header: string = req.headers['authorization'] || '';
     const token = header.startsWith('Bearer ') ? header.slice(7) : null;
     if (!token) throw new UnauthorizedException('未登录');
+    let user: JwtUser;
     try {
-      req.user = this.jwt.verify<JwtUser>(token);
-      return true;
+      user = this.jwt.verify<JwtUser>(token);
     } catch {
       throw new UnauthorizedException('登录已过期，请重新登录');
     }
+    // 无状态令牌兜底：封禁/删除后立即失效，而非等 7 天过期
+    if (!(await this.accounts.isActive(user.sub))) {
+      throw new UnauthorizedException('账号不可用，请重新登录或联系客服');
+    }
+    req.user = user;
+    return true;
   }
 }
 

@@ -68,6 +68,7 @@ export const ORDER_STATUS: Record<string, { text: string; color: string }> = {
 export const TICKET_STATUS: Record<string, { text: string; color: string }> = {
   open: { text: '待处理', color: 'orange' },
   answered: { text: '已回复', color: 'green' },
+  resolved: { text: '已解决·待确认', color: 'blue' },
   closed: { text: '已关闭', color: 'default' },
 };
 

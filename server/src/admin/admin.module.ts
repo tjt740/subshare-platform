@@ -18,6 +18,7 @@ import {
   SupplierSubmission,
   Ticket,
   TicketMessage,
+  TicketTransfer,
   User,
   WalletTransaction,
 } from '../entities';
@@ -44,6 +45,7 @@ import { OrdersModule } from '../orders/orders.module';
       Subscription,
       Ticket,
       TicketMessage,
+      TicketTransfer,
       SupplierSubmission,
       WalletTransaction,
       SiteSetting,

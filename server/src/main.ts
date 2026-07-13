@@ -6,7 +6,15 @@ import { DataSource } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AppModule } from './app.module';
-import { ALL_ENTITIES, InventoryAccount, Order, SiteSetting, User } from './entities';
+import {
+  ALL_ENTITIES,
+  InventoryAccount,
+  Order,
+  SiteSetting,
+  Ticket,
+  TicketMessage,
+  User,
+} from './entities';
 import { runSeed } from './seed-data';
 
 /**
@@ -63,6 +71,12 @@ async function preflight() {
     );
   }
 }
+
+// 兜底：任何漏网的 Promise 异常只记录日志，绝不让进程崩溃（HTTP 层已各自处理错误）
+process.on('unhandledRejection', (reason) => {
+  // eslint-disable-next-line no-console
+  console.error('[subshare] 未处理的 Promise 异常：', reason);
+});
 
 async function bootstrap() {
   await preflight();
@@ -124,6 +138,53 @@ async function bootstrap() {
       await settingRepo.save(
         settingRepo.create({
           key: 'migration_v10_finance',
+          value: new Date().toISOString(),
+        }),
+      );
+    }
+
+    // P0 客服闭环升级：只补齐历史发送人快照与时间，不改写或删除原对话内容。
+    const ticketMigrated = await settingRepo.findOneBy({
+      key: 'migration_v13_ticket_flow',
+    });
+    if (!ticketMigrated) {
+      const ticketRepo = ds.getRepository(Ticket);
+      const messageRepo = ds.getRepository(TicketMessage);
+      const [tickets, messages, users] = await Promise.all([
+        ticketRepo.find(),
+        messageRepo.find({ order: { id: 'ASC' } }),
+        ds.getRepository(User).find(),
+      ]);
+      const userMap = new Map(users.map((u) => [u.id, u]));
+      const ticketMap = new Map(tickets.map((t) => [t.id, t]));
+      for (const message of messages) {
+        const ticket = ticketMap.get(message.ticketId);
+        if (!message.senderName) {
+          if (message.senderRole === 'user' && ticket) {
+            const customer = userMap.get(ticket.userId);
+            message.senderId = ticket.userId;
+            message.senderName =
+              customer?.nickname || customer?.email?.split('@')[0] || '用户';
+          } else if (message.senderRole === 'admin') {
+            message.senderName = '历史客服';
+          } else {
+            message.senderName = '系统';
+          }
+          await messageRepo.save(message);
+        }
+      }
+      for (const ticket of tickets) {
+        const last = messages.filter((m) => m.ticketId === ticket.id).at(-1);
+        ticket.lastMessageAt =
+          ticket.lastMessageAt || last?.createdAt || ticket.updatedAt || ticket.createdAt;
+        if (ticket.status === 'closed') {
+          ticket.closedAt = ticket.closedAt || ticket.updatedAt || ticket.createdAt;
+        }
+        await ticketRepo.save(ticket);
+      }
+      await settingRepo.save(
+        settingRepo.create({
+          key: 'migration_v13_ticket_flow',
           value: new Date().toISOString(),
         }),
       );

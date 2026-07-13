@@ -161,6 +161,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     localStorage.removeItem('ss_token');
+    // 清空购物车：避免共享/公用设备上下一位登录者继承上一位的购物车（错误下单+隐私）
+    localStorage.removeItem('ss_cart');
+    setCart([]);
     setToken(null);
     setUser(null);
   }, []);

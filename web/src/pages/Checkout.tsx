@@ -96,6 +96,7 @@ export default function Checkout() {
   const currency = lines[0]?.currency ?? 'USD';
   const usd = toUsd(total, currency);
   const balanceEnough = (user?.balance ?? 0) >= usd;
+  const hasOOS = lines.some((l) => (l.stock ?? 0) <= 0); // 有缺货项则禁用提交
 
   async function submit() {
     setSubmitting(true);
@@ -124,9 +125,11 @@ export default function Checkout() {
         { method: 'POST', token, body: JSON.stringify({ provider }) },
       );
       track('payment_start', { orderId: order.id, provider, total, currency });
-      if (isCart) clearCart();
+      // 购物车只在「已即时支付成功」(余额付) 时清空；
+      // mock 通道此刻只是待支付，清空推迟到 Pay 页支付成功后（失败/放弃不丢购物车）
+      if (isCart && res.paid) clearCart();
       if (provider === 'balance') refreshUser();
-      navigate(`/pay/${res.paymentId}`);
+      navigate(`/pay/${res.paymentId}`, { state: { fromCart: isCart } });
     } catch (e: any) {
       setError(e.message);
       setSubmitting(false);
@@ -243,14 +246,21 @@ export default function Checkout() {
 
       {error && <div className="alert alert-error">{error}</div>}
 
+      {hasOOS && (
+        <div className="alert alert-error" style={{ marginBottom: 10 }}>
+          购物清单中有商品暂时缺货，请返回移除后再结算。
+        </div>
+      )}
       <button
         className="btn btn-primary btn-lg btn-block"
-        disabled={submitting || lines.length === 0}
+        disabled={submitting || lines.length === 0 || hasOOS}
         onClick={submit}
       >
         {submitting
           ? t('checkout.creating')
-          : t('checkout.submit', { amt: money(total, currency) })}
+          : hasOOS
+            ? '有商品缺货，暂不可下单'
+            : t('checkout.submit', { amt: money(total, currency) })}
       </button>
       <p className="tiny-note terms-note">
         {t('checkout.agree2')}{' '}

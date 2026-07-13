@@ -11,7 +11,7 @@ export type IconName =
   | 'lock' | 'info' | 'star' | 'fire' | 'gift' | 'truck' | 'sparkle' | 'plus'
   | 'stream' | 'music' | 'ai' | 'office' | 'study' | 'game' | 'tag' | 'upload'
   | 'card' | 'alipay' | 'crypto' | 'arrowRight' | 'send' | 'edit' | 'warn'
-  | 'chevron-down' | 'google' | 'github' | 'microsoft';
+  | 'chevron-down' | 'google' | 'github' | 'microsoft' | 'bell';
 
 const P: Record<IconName, React.ReactNode> = {
   cart: <><circle cx="9" cy="20" r="1.6" /><circle cx="18" cy="20" r="1.6" /><path d="M2 3h3l2.6 12.4a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.6L21 8H6" /></>,
@@ -45,6 +45,7 @@ const P: Record<IconName, React.ReactNode> = {
   sparkle: <><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /><path d="M18.5 15l.9 2.2 2.1.8-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.8z" /></>,
   plus: <><path d="M12 5v14M5 12h14" /></>,
   'chevron-down': <><path d="M6 9l6 6 6-6" /></>,
+  bell: <><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.7 21a2 2 0 0 1-3.4 0" /></>,
   google: <><path d="M21 12.2c0-.7-.1-1.4-.2-2H12v3.9h5.1a4.4 4.4 0 0 1-1.9 2.9v2.4h3.1c1.8-1.7 2.7-4.2 2.7-7.2z" /><path d="M12 21.5c2.6 0 4.7-.9 6.3-2.3l-3.1-2.4c-.9.6-2 .9-3.2.9-2.5 0-4.6-1.7-5.3-3.9H3.5v2.5A9.5 9.5 0 0 0 12 21.5z" /><path d="M6.7 13.8a5.7 5.7 0 0 1 0-3.6V7.7H3.5a9.5 9.5 0 0 0 0 8.6z" /><path d="M12 6.3c1.4 0 2.7.5 3.7 1.5l2.7-2.7A9.2 9.2 0 0 0 12 2.5a9.5 9.5 0 0 0-8.5 5.2l3.2 2.5c.7-2.2 2.8-3.9 5.3-3.9z" /></>,
   github: <><path d="M9 19c-4 1.3-4-2.2-6-2.7m12 5.4v-3.5c0-1 .1-1.4-.5-2 2.8-.3 5.5-1.4 5.5-6a4.6 4.6 0 0 0-1.3-3.2 4.3 4.3 0 0 0-.1-3.2s-1-.3-3.4 1.3a11.6 11.6 0 0 0-6 0C6.3 3.5 5.3 3.8 5.3 3.8a4.3 4.3 0 0 0-.1 3.2A4.6 4.6 0 0 0 3.9 10.2c0 4.6 2.7 5.7 5.5 6-.5.6-.5 1.2-.5 2v3.5" /></>,
   microsoft: <><rect x="3.5" y="3.5" width="7.5" height="7.5" /><rect x="13" y="3.5" width="7.5" height="7.5" /><rect x="3.5" y="13" width="7.5" height="7.5" /><rect x="13" y="13" width="7.5" height="7.5" /></>,

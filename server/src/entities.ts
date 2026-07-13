@@ -222,7 +222,7 @@ export class Order {
   status: 'created' | 'paid' | 'allocating' | 'delivered' | 'refunded' | 'canceled';
   @Column({ type: 'datetime', nullable: true }) paidAt: Date | null;
   @Column({ type: 'text', default: 'unpaid' })
-  paymentStatus: 'unpaid' | 'paid' | 'partially_refunded' | 'refunded' | 'failed';
+  paymentStatus: 'unpaid' | 'paid' | 'partially_refunded' | 'refunded' | 'failed' | 'canceled';
   @Column({ type: 'text', default: 'pending' })
   fulfillmentStatus: 'pending' | 'processing' | 'partial' | 'delivered' | 'failed';
   @Column({ type: 'text', default: 'none' })
@@ -314,8 +314,22 @@ export class Ticket {
   @Column({ type: 'integer', nullable: true }) subscriptionId: number | null;
   @Column({ type: 'text', default: 'general' }) category: string;
   @Column({ type: 'text' }) subject: string;
-  // open=待客服处理 answered=已回复待用户 closed=已关闭
-  @Column({ type: 'text', default: 'open' }) status: 'open' | 'answered' | 'closed';
+  // open=待客服处理 answered=已回复待用户 resolved=客服已解决待用户确认 closed=已完成
+  @Column({ type: 'text', default: 'open' })
+  status: 'open' | 'answered' | 'resolved' | 'closed';
+  @Column({ type: 'integer', nullable: true }) assignedAgentId: number | null;
+  @Column({ type: 'datetime', nullable: true }) assignedAt: Date | null;
+  @Column({ type: 'datetime', nullable: true }) firstResponseAt: Date | null;
+  @Column({ type: 'datetime', nullable: true }) lastMessageAt: Date | null;
+  @Column({ type: 'datetime', nullable: true }) resolvedAt: Date | null;
+  @Column({ type: 'integer', nullable: true }) resolvedBy: number | null;
+  @Column({ type: 'text', default: '' }) resolutionNote: string;
+  @Column({ type: 'datetime', nullable: true }) closedAt: Date | null;
+  @Column({ type: 'integer', default: 0 }) transferCount: number;
+  @Column({ type: 'integer', nullable: true }) rating: number | null;
+  @Column({ type: 'text', default: '' }) ratingComment: string;
+  @Column({ type: 'datetime', nullable: true }) ratedAt: Date | null;
+  @Column({ type: 'integer', nullable: true }) ratedAgentId: number | null;
   @CreateDateColumn() createdAt: Date;
   @UpdateDateColumn() updatedAt: Date;
 }
@@ -326,8 +340,30 @@ export class TicketMessage {
   @Index()
   @Column({ type: 'integer' })
   ticketId: number;
-  @Column({ type: 'text' }) senderRole: 'user' | 'admin';
+  @Column({ type: 'text' }) senderRole: 'user' | 'admin' | 'system';
+  /** 发送人 ID + 当时显示名快照：账号资料或客服归属变化不会改写历史 */
+  @Column({ type: 'integer', nullable: true }) senderId: number | null;
+  @Column({ type: 'text', default: '' }) senderName: string;
+  @Column({ type: 'text', default: 'text' })
+  messageType: 'text' | 'system' | 'transfer' | 'resolution' | 'rating';
+  @Column({ type: 'text', default: '{}' }) metadata: string;
   @Column({ type: 'text' }) content: string;
+  @CreateDateColumn() createdAt: Date;
+}
+
+/** 客服转接历史单独留档，任何客服变更都不会覆盖会话与原处理人 */
+@Entity('ticket_transfers')
+export class TicketTransfer {
+  @PrimaryGeneratedColumn() id: number;
+  @Index()
+  @Column({ type: 'integer' }) ticketId: number;
+  @Column({ type: 'integer', nullable: true }) fromAgentId: number | null;
+  @Column({ type: 'text', default: '' }) fromAgentName: string;
+  @Column({ type: 'integer' }) toAgentId: number;
+  @Column({ type: 'text', default: '' }) toAgentName: string;
+  @Column({ type: 'integer' }) initiatedBy: number;
+  @Column({ type: 'text' }) initiatedRole: 'user' | 'admin' | 'super';
+  @Column({ type: 'text', default: '' }) reason: string;
   @CreateDateColumn() createdAt: Date;
 }
 
@@ -401,8 +437,28 @@ export class AnalyticsEvent {
   @CreateDateColumn() createdAt: Date;
 }
 
+/** 站内通知（到期提醒、订单/售后状态变更等） */
+@Entity('notifications')
+export class Notification {
+  @PrimaryGeneratedColumn() id: number;
+  @Index()
+  @Column({ type: 'integer' })
+  userId: number;
+  @Column({ type: 'text', default: 'system' }) type: string;
+  @Column({ type: 'text' }) title: string;
+  @Column({ type: 'text', default: '' }) body: string;
+  @Column({ type: 'text', default: '' }) link: string;
+  /** 去重键：同一事件只提醒一次（如 sub_expiring:<subId>:<到期日>） */
+  @Index({ unique: true })
+  @Column({ type: 'text', nullable: true })
+  dedupeKey: string | null;
+  @Column({ type: 'boolean', default: false }) read: boolean;
+  @CreateDateColumn() createdAt: Date;
+}
+
 export const ALL_ENTITIES = [
   User,
+  Notification,
   Product,
   Plan,
   PriceBook,
@@ -418,6 +474,7 @@ export const ALL_ENTITIES = [
   Subscription,
   Ticket,
   TicketMessage,
+  TicketTransfer,
   SupplierSubmission,
   SiteSetting,
   SiteConfigRevision,

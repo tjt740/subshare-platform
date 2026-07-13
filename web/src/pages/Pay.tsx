@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { api, money } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
@@ -29,9 +29,10 @@ const PROVIDER_LABEL: Record<string, string> = {
 /** Mock 收银台 */
 export default function Pay() {
   const { paymentId } = useParams();
-  const { token, user, refreshUser } = useApp();
+  const { token, user, refreshUser, clearCart } = useApp();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const location = useLocation() as { state?: { fromCart?: boolean } };
   const [payment, setPayment] = useState<PaymentView | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -75,7 +76,11 @@ export default function Pay() {
           provider: payment.provider,
         },
       );
-      // 成长值/等级变化提示（充值与消费都会累计成长值）
+      // 支付成功且来自购物车 → 此刻才清空购物车（失败/放弃不丢购物车）
+      if (success && payment.purpose === 'order' && location.state?.fromCart) {
+        clearCart();
+      }
+      // 成长值/等级变化提示（充值累计成长值；余额支付不再重复累计）
       const before = user?.level ?? 1;
       const fresh = await api<{ level: number }>('/auth/me', { token });
       if (success && fresh.level > before) {

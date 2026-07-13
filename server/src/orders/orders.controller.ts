@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
 import {
   ArrayMaxSize,
   IsArray,
@@ -46,5 +46,11 @@ export class OrdersController {
   @Get('me/subscriptions')
   subscriptions(@CurrentUser() user: JwtUser) {
     return this.orders.listMySubscriptions(user.sub);
+  }
+
+  /** 取消未支付订单（仅本人、仅 created 态） */
+  @Post('orders/:id/cancel')
+  cancel(@CurrentUser() user: JwtUser, @Param('id') id: string) {
+    return this.orders.cancelMine(user.sub, Number(id));
   }
 }

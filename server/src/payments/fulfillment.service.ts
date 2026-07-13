@@ -1,6 +1,6 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, LessThan, Repository } from 'typeorm';
 import {
   InventoryAccount,
   Order,
@@ -13,6 +13,10 @@ import {
   Subscription,
   toUsd,
 } from '../entities';
+import { KeyedLock } from '../common/keyed-lock';
+
+/** 全局库存锁 key：所有席位分配/回收串行，杜绝超卖（单节点内足够） */
+const INV_LOCK = 'inventory:slots';
 
 /**
  * 交付引擎（支持多商品订单）：
@@ -36,6 +40,7 @@ export class FulfillmentService {
     private readonly assignments: Repository<SlotAssignment>,
     @InjectRepository(Subscription)
     private readonly subs: Repository<Subscription>,
+    private readonly lock: KeyedLock,
   ) {}
 
   private async bumpSold(planId: number) {
@@ -71,8 +76,12 @@ export class FulfillmentService {
     return { slot, account };
   }
 
-  /** 交付整单：返回是否全部完成 */
+  /** 交付整单：返回是否全部完成。全程持库存锁，杜绝并发超卖 */
   async fulfill(order: Order): Promise<boolean> {
+    return this.lock.run(INV_LOCK, () => this.fulfillLocked(order));
+  }
+
+  private async fulfillLocked(order: Order): Promise<boolean> {
     order.fulfillmentStatus = 'processing';
     await this.orders.save(order);
     const items = await this.orderItems.findBy({
@@ -182,6 +191,10 @@ export class FulfillmentService {
 
   /** 售后补发：换新坑位并更新凭据（旧坑位作废不复用） */
   async reissue(subscriptionId: number) {
+    return this.lock.run(INV_LOCK, () => this.reissueLocked(subscriptionId));
+  }
+
+  private async reissueLocked(subscriptionId: number) {
     const sub = await this.subs.findOneBy({ id: subscriptionId });
     if (!sub) throw new BadRequestException('订阅不存在');
     if (sub.status !== 'active') {
@@ -212,6 +225,10 @@ export class FulfillmentService {
 
   /** 退款/撤销：吊销本单订阅并回收坑位；续费项回退顺延时长 */
   async revoke(order: Order) {
+    return this.lock.run(INV_LOCK, () => this.revokeLocked(order));
+  }
+
+  private async revokeLocked(order: Order) {
     const assignments = await this.assignments.findBy({ orderId: order.id });
     for (const assignment of assignments) {
       assignment.status = 'refunded';
@@ -250,5 +267,49 @@ export class FulfillmentService {
         await this.subs.save(sub);
       }
     }
+  }
+
+  /**
+   * 到期回收：把已过期的生效订阅置 expired，并把其占用的坑位释放回池（free）。
+   * 由定时任务与用户打开「我的订阅」时惰性触发；持库存锁保证与分配互斥。
+   * 返回本次回收的订阅数（供日志/监控）。
+   */
+  async sweepExpired(now = new Date()): Promise<number> {
+    return this.lock.run(INV_LOCK, async () => {
+      const due = await this.subs.find({
+        where: { status: 'active', expiresAt: LessThan(now) },
+      });
+      for (const sub of due) {
+        sub.status = 'expired';
+        await this.subs.save(sub);
+        // 关键修复：到期必须把坑位放回池子，否则库存单调泄漏
+        if (sub.slotId) {
+          const slot = await this.slots.findOneBy({ id: sub.slotId });
+          if (slot && slot.status === 'assigned') {
+            slot.status = 'free';
+            slot.orderId = null;
+            await this.slots.save(slot);
+          }
+        }
+        // 关闭对应的分配记录
+        const acts = await this.assignments.findBy({ subscriptionId: sub.id, status: 'active' });
+        for (const a of acts) {
+          a.status = 'ended';
+          await this.assignments.save(a);
+        }
+      }
+      return due.length;
+    });
+  }
+
+  /** 即将到期（N 天内）的生效订阅，用于到期提醒 */
+  async dueSoon(days = 3, now = new Date()) {
+    const until = new Date(now.getTime() + days * 86400000);
+    const rows = await this.subs.find({
+      where: { status: 'active', expiresAt: LessThan(until) },
+      order: { expiresAt: 'ASC' },
+    });
+    // 排除已过期的（那些交给 sweepExpired）
+    return rows.filter((s) => new Date(s.expiresAt) >= now);
   }
 }

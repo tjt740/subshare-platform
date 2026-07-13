@@ -53,6 +53,15 @@ class UpdateProfileDto {
   avatarFrame?: string;
 }
 
+class ResetPasswordDto {
+  @IsString()
+  token: string;
+  @IsString()
+  @MinLength(6, { message: '新密码至少 6 位' })
+  @MaxLength(64)
+  newPassword: string;
+}
+
 class ChangePasswordDto {
   @IsString()
   oldPassword: string;
@@ -149,8 +158,8 @@ export class AuthController {
 
   /** 用令牌重置密码 */
   @Post('reset-password')
-  reset(@Body() body: { token: string; newPassword: string }) {
-    return this.auth.resetPassword(body?.token || '', body?.newPassword || '');
+  reset(@Body() body: ResetPasswordDto) {
+    return this.auth.resetPassword(body.token, body.newPassword);
   }
 
   /** 我的登录记录（账户安全） */
