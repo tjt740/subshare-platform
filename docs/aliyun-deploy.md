@@ -29,6 +29,8 @@ npm run deploy:aliyun
 - `ALIYUN_SSH_KEY`：部署私钥全文
 - `ALIYUN_DEPLOY_PATH`：`/home/admin/subshare-platform`
 
+部署配置缺失时工作流会直接失败并指出缺少的 Secret，避免出现“工作流成功、实际没有部署”的假成功状态。
+
 阿里云安全组只需放行入方向 TCP `9999`。API 的 `9998` 只监听 `127.0.0.1`，不应对公网开放。
 
 ## 运维检查
