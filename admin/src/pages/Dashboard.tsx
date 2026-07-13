@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Card, Col, Row, Statistic, Table, Tag, message } from 'antd';
 import { api, ORDER_STATUS } from '../api';
+import { FinanceLineChart } from '../components/SimpleCharts';
 
 export default function Dashboard() {
   const [data, setData] = useState<any>(null);
@@ -98,6 +99,25 @@ export default function Dashboard() {
           </Card>
         </Col>
       </Row>
+
+      <Card title="经营利润（权责发生制）" style={{ marginTop: 16 }}>
+        <Row gutter={[12, 12]}>
+          <Col xs={12} lg={6}><Statistic title="现金成交收入" prefix="$" value={data?.finance?.cashRevenueUsd ?? 0} precision={2} /></Col>
+          <Col xs={12} lg={6}><Statistic title="随服务确认收入" prefix="$" value={data?.finance?.recognizedRevenueUsd ?? 0} precision={2} valueStyle={{ color: '#4f46e5' }} /></Col>
+          <Col xs={12} lg={6}><Statistic title="已摊销账号成本" prefix="$" value={data?.finance?.recognizedCostUsd ?? 0} precision={2} valueStyle={{ color: '#d97706' }} /></Col>
+          <Col xs={12} lg={6}><Statistic title="当前毛利润" prefix="$" value={data?.finance?.grossProfitUsd ?? 0} precision={2} suffix={` / ${data?.finance?.grossMargin ?? 0}%`} valueStyle={{ color: (data?.finance?.grossProfitUsd ?? 0) >= 0 ? '#16a34a' : '#dc2626' }} /></Col>
+        </Row>
+        <div style={{ background: '#fff7e6', border: '1px solid #fde3ad', borderRadius: 10, padding: 12, margin: '14px 0' }}>
+          <b>${Number(data?.finance?.grossProfitUsd || 0).toFixed(2)} 毛利润</b>
+          {' = '}${Number(data?.finance?.recognizedRevenueUsd || 0).toFixed(2)} 已确认收入
+          {' - '}${Number(data?.finance?.recognizedCostUsd || 0).toFixed(2)} 摊销成本
+          {' - '}${Number(data?.finance?.paymentFeesUsd || 0).toFixed(2)} 支付手续费
+          <div style={{ color: '#777', fontSize: 12, marginTop: 4 }}>
+            未完成的服务收入暂列递延收入 ${Number(data?.finance?.deferredRevenueUsd || 0).toFixed(2)}，随着服务天数增加逐日转为确认收入。
+          </div>
+        </div>
+        <FinanceLineChart data={data?.trend ?? []} />
+      </Card>
 
       <Card title="最近订单" style={{ marginTop: 16 }}>
         <Table

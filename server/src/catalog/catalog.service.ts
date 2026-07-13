@@ -94,6 +94,7 @@ export class CatalogService {
         rating: p.rating,
         soldCount: p.soldCount,
         badge: meta.badge ?? null,
+        brand: meta.brand ?? null,
         officialPriceUsd: meta.officialPriceUsd ?? null,
         sale: meta.sale ?? null, // {endsAt, label} 特惠倒计时
         fromPrice: cheapest.price,
@@ -157,6 +158,7 @@ export class CatalogService {
         productTitle: product.title,
         productSlug: product.slug,
         category: product.category,
+        brand: this.parseMeta(product.meta).brand ?? null,
         unitPrice,
         currency,
         stock: await this.stockOfPlan(planId),
@@ -190,6 +192,7 @@ export class CatalogService {
         title: product.title,
         category: product.category,
         badge: this.parseMeta(product.meta).badge ?? null,
+        brand: this.parseMeta(product.meta).brand ?? null,
       },
     };
   }

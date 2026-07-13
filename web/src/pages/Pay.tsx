@@ -5,6 +5,7 @@ import { useApp } from '../store';
 import { useI18n } from '../i18n';
 import { ConfettiBurst } from '../components/CanvasFx';
 import Icon from '../components/Icon';
+import { track } from '../track';
 
 interface PaymentView {
   id: number;
@@ -60,6 +61,20 @@ export default function Pay() {
         status: result.paymentStatus as PaymentView['status'],
         orderStatus: result.orderStatus,
       });
+      track(
+        success
+          ? payment.purpose === 'recharge'
+            ? 'recharge_success'
+            : 'payment_success'
+          : 'payment_fail',
+        {
+          paymentId: payment.id,
+          orderNo: payment.orderNo,
+          amount: payment.amount,
+          currency: payment.currency,
+          provider: payment.provider,
+        },
+      );
       // 成长值/等级变化提示（充值与消费都会累计成长值）
       const before = user?.level ?? 1;
       const fresh = await api<{ level: number }>('/auth/me', { token });

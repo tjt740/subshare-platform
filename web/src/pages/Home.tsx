@@ -12,6 +12,8 @@ import { useI18n } from '../i18n';
 import { Marquee, Reveal, SaleCountdown } from '../components/fx';
 import { HeroCanvas } from '../components/CanvasFx';
 import Icon, { CATEGORY_ICON_NAME } from '../components/Icon';
+import BrandIcon, { BRAND_TINT } from '../components/BrandIcon';
+import { track } from '../track';
 
 interface ProductCard {
   id: number;
@@ -26,6 +28,7 @@ interface ProductCard {
   fromPrice: number;
   currency: string;
   totalStock: number;
+  brand?: string | null;
   sale?: { endsAt: string; label?: string } | null;
 }
 
@@ -156,6 +159,7 @@ export default function Home() {
             placeholder={t('catalog.searchPh')}
             value={keyword}
             onChange={(e) => setKeyword(e.target.value)}
+            onBlur={(e) => e.target.value && track('search', { keyword: e.target.value })}
           />
         </div>
       </div>
@@ -171,7 +175,10 @@ export default function Home() {
       ) : (
         <div className="product-grid">
           {filtered.map((p, i) => {
-            const tint = CATEGORY_TINT[p.category] ?? ['#fb9920', '#fb9920'];
+            const brandTint = p.brand ? (BRAND_TINT as any)[p.brand] : null;
+            const tint = brandTint
+              ? [brandTint, brandTint]
+              : CATEGORY_TINT[p.category] ?? ['#fb9920', '#fb9920'];
             const pct = savePercent(p);
             return (
               <Link
@@ -179,12 +186,21 @@ export default function Home() {
                 to={`/p/${p.slug}`}
                 key={p.id}
                 style={{ animationDelay: `${i * 0.06}s` } as React.CSSProperties}
+                onClick={() =>
+                  track('click', { target: 'product_card', slug: p.slug, productTitle: p.title })
+                }
               >
                 <div
                   className="card-banner"
                   style={{ '--tint1': tint[0], '--tint2': tint[1] } as React.CSSProperties}
                 >
-                  <div className="card-logo"><Icon name={CATEGORY_ICON_NAME[p.category] ?? 'box'} size={26} /></div>
+                  <div className="card-logo">
+                    {p.brand ? (
+                      <BrandIcon brand={p.brand} size={28} />
+                    ) : (
+                      <Icon name={CATEGORY_ICON_NAME[p.category] ?? 'box'} size={26} />
+                    )}
+                  </div>
                   <div>
                     <span className="chip">{p.category}</span>{' '}
                     <span className={`chip ${p.totalStock > 0 ? 'chip-ok' : 'chip-warn'}`}>

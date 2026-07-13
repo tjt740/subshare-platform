@@ -627,8 +627,15 @@ export class AdminService {
         note: data.note || '',
       }),
     );
-    account.costAmount = money(account.costAmount + amount);
-    account.costUsd = money(account.costUsd + entry.amountUsd);
+    const newCostUsd = money(account.costUsd + entry.amountUsd);
+    if (account.costCurrency === currency) {
+      account.costAmount = money(account.costAmount + amount);
+    } else {
+      // 多币种成本统一切换为 USD 汇总，避免直接把人民币和美元相加。
+      account.costAmount = newCostUsd;
+      account.costCurrency = 'USD';
+    }
+    account.costUsd = newCostUsd;
     account.lastRechargedAt = new Date();
     if (data.effectiveTo) account.expiresAt = new Date(data.effectiveTo);
     account.updatedBy = operatorId;

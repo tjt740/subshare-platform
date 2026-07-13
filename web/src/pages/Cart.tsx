@@ -4,6 +4,8 @@ import { api, money } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
 import Icon, { CATEGORY_ICON_NAME } from '../components/Icon';
+import BrandIcon from '../components/BrandIcon';
+import { track } from '../track';
 
 interface QuoteItem {
   planId: number;
@@ -50,6 +52,7 @@ export default function Cart() {
   const hasUnavailable = (quote?.items.length ?? 0) > buyable.length;
 
   function checkout() {
+    track('checkout_start', { source: 'cart', items: buyable.length, total: buyableTotal });
     if (!token) {
       navigate('/login', { state: { from: '/cart' } });
       return;
@@ -81,7 +84,13 @@ export default function Cart() {
               const q = quote?.items.find((i) => i.planId === c.planId);
               return (
                 <div className="cart-item" key={c.planId}>
-                  <div className="card-logo"><Icon name={CATEGORY_ICON_NAME[c.category] ?? 'box'} size={24} /></div>
+                  <div className="card-logo">
+                    {(q as any)?.brand ? (
+                      <BrandIcon brand={(q as any).brand} size={24} />
+                    ) : (
+                      <Icon name={CATEGORY_ICON_NAME[c.category] ?? 'box'} size={24} />
+                    )}
+                  </div>
                   <div className="ci-info">
                     <b>{c.productTitle}</b>
                     <span className="muted small">{c.planName}</span>
@@ -102,7 +111,13 @@ export default function Cart() {
                       ? money(q.unitPrice!, q.currency!)
                       : '--'}
                   </div>
-                  <button className="btn btn-ghost btn-sm" onClick={() => removeFromCart(c.planId)}>
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => {
+                      track('remove_from_cart', { productTitle: c.productTitle, planId: c.planId });
+                      removeFromCart(c.planId);
+                    }}
+                  >
                     {t('cart.remove')}
                   </button>
                 </div>

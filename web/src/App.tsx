@@ -20,6 +20,8 @@ import Legal from './pages/Legal';
 import Forgot from './pages/Forgot';
 import Avatar from './components/Avatar';
 import Icon from './components/Icon';
+import Onboarding, { openOnboarding } from './components/Onboarding';
+import { track, trackPageView } from './track';
 import SupportWidget from './components/SupportWidget';
 import {
   BootSplash,
@@ -73,8 +75,12 @@ function Header() {
       />
       <header className="site-header">
         <div className="container header-inner">
-          <Link to="/" className="brand" aria-label="SubShare 首页">
-            <span className="brand-mark" aria-hidden>S</span> SubShare
+          <Link to="/" className="brand" aria-label="SubShare 首页" data-track="click" data-track-label="logo">
+            <span className="brand-mark" aria-hidden>S</span>
+            <span className="brand-name">
+              <span className="bn-base">SubShare</span>
+              <span className="bn-shine" aria-hidden>SubShare</span>
+            </span>
           </Link>
           <nav className="nav" aria-label="主导航">
             <Link to="/">{t('nav.products')}</Link>
@@ -181,6 +187,7 @@ function Header() {
               </div>
             )}
             <div className="ms-legal">
+              <a href="#" onClick={(e) => { e.preventDefault(); setMenuOpen(false); openOnboarding(); }}>新手引导</a>
               <Link to="/legal/terms" onClick={() => setMenuOpen(false)}>{t('legal.terms')}</Link>
               <Link to="/legal/privacy" onClick={() => setMenuOpen(false)}>{t('legal.privacy')}</Link>
               <Link to="/legal/refund" onClick={() => setMenuOpen(false)}>{t('legal.refund')}</Link>
@@ -241,6 +248,7 @@ function Footer() {
         </div>
         <div>
           <h4>{t('footer.help')}</h4>
+          <a href="#" onClick={(e) => { e.preventDefault(); openOnboarding(); }}>新手引导</a>
           <Link to="/account">{t('footer.mySubs')}</Link>
           <Link to="/account?tab=orders">{t('footer.orderQuery')}</Link>
           <Link to="/account?tab=wallet">{t('footer.recharge')}</Link>
@@ -275,6 +283,15 @@ function ScrollToTop() {
   return null;
 }
 
+/** 路由变化自动上报 PV */
+function PageTracker() {
+  const location = useLocation();
+  React.useEffect(() => {
+    trackPageView({ path: location.pathname });
+  }, [location.pathname, location.search]);
+  return null;
+}
+
 export default function App() {
   const location = useLocation();
   return (
@@ -282,6 +299,7 @@ export default function App() {
       <BootSplash />
       <Cursor />
       <ScrollToTop />
+      <PageTracker />
       <LocalePath />
       <Header />
       <main className="container main">
@@ -303,6 +321,7 @@ export default function App() {
       <Footer />
       <SupportWidget />
       <MobileTabbar />
+      <Onboarding />
     </>
   );
 }

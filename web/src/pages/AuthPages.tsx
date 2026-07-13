@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
+import { track } from '../track';
 
 function AuthForm({ mode }: { mode: 'login' | 'register' }) {
   const { login, register } = useApp();
@@ -24,8 +25,13 @@ function AuthForm({ mode }: { mode: 'login' | 'register' }) {
     }
     setSubmitting(true);
     try {
-      if (mode === 'login') await login(email, password);
-      else await register(email, password);
+      if (mode === 'login') {
+        await login(email, password);
+        track('login', { email });
+      } else {
+        await register(email, password);
+        track('signup', { email });
+      }
       navigate(location.state?.from || '/');
     } catch (err: any) {
       setError(err.message);

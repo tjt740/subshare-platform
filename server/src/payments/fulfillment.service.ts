@@ -6,6 +6,7 @@ import {
   Order,
   OrderItem,
   Plan,
+  PriceBook,
   Product,
   Slot,
   SlotAssignment,
@@ -26,6 +27,7 @@ export class FulfillmentService {
     @InjectRepository(OrderItem)
     private readonly orderItems: Repository<OrderItem>,
     @InjectRepository(Plan) private readonly plans: Repository<Plan>,
+    @InjectRepository(PriceBook) private readonly prices: Repository<PriceBook>,
     @InjectRepository(Product) private readonly products: Repository<Product>,
     @InjectRepository(InventoryAccount)
     private readonly accounts: Repository<InventoryAccount>,
@@ -40,6 +42,18 @@ export class FulfillmentService {
     const plan = await this.plans.findOneBy({ id: planId });
     if (!plan) return;
     await this.products.increment({ id: plan.productId }, 'soldCount', 1);
+  }
+
+  private async paymentFeeUsd(item: OrderItem, region: string) {
+    const row =
+      (await this.prices.findOneBy({ planId: item.planId, region })) ||
+      (await this.prices.findOneBy({ planId: item.planId, region: 'GLOBAL' }));
+    if (!row || !row.price || !row.paymentFeeAmount) return 0;
+    return Math.round(
+      toUsd(item.unitPrice, item.currency) *
+        (row.paymentFeeAmount / row.price) *
+        100,
+    ) / 100;
   }
 
   /** 从健康账号池取一个空闲坑位 */
@@ -70,6 +84,7 @@ export class FulfillmentService {
     for (const item of items) {
       const plan = await this.plans.findOneBy({ id: item.planId });
       const months = plan?.periodMonths ?? 1;
+      const paymentFeeUsd = await this.paymentFeeUsd(item, order.region);
 
       // 续费：同套餐已有生效订阅 -> 顺延
       const existing = await this.subs.findOneBy({
@@ -98,7 +113,7 @@ export class FulfillmentService {
                 saleAmount: item.unitPrice,
                 saleCurrency: item.currency,
                 saleUsd: toUsd(item.unitPrice, item.currency),
-                paymentFeeUsd: 0,
+                paymentFeeUsd,
                 refundUsd: 0,
                 status: 'active',
               }),
@@ -148,7 +163,7 @@ export class FulfillmentService {
           saleAmount: item.unitPrice,
           saleCurrency: item.currency,
           saleUsd: toUsd(item.unitPrice, item.currency),
-          paymentFeeUsd: 0,
+          paymentFeeUsd,
           refundUsd: 0,
           status: 'active',
         }),

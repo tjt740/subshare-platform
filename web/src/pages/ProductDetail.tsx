@@ -5,6 +5,8 @@ import { useApp } from '../store';
 import { useI18n } from '../i18n';
 import { Reveal, SaleCountdown } from '../components/fx';
 import Icon, { CATEGORY_ICON_NAME } from '../components/Icon';
+import BrandIcon from '../components/BrandIcon';
+import { track } from '../track';
 
 interface PlanView {
   id: number;
@@ -24,6 +26,7 @@ interface Detail {
   rating: number;
   soldCount: number;
   meta: {
+    brand?: string;
     badge?: string;
     officialPriceUsd?: number;
     features?: { icon: string; title: string; desc: string }[];
@@ -57,6 +60,12 @@ export default function ProductDetail() {
         setDetail(d);
         const first = d.plans.find((p) => p.stock > 0) ?? d.plans[0];
         setPlanId(first ? first.id : null);
+        track('product_view', {
+          slug: d.slug,
+          productTitle: d.title,
+          category: d.category,
+          brand: d.meta?.brand,
+        });
       })
       .catch((e) => setError(e.message));
   }, [slug, region]);
@@ -65,7 +74,16 @@ export default function ProductDetail() {
   const inCart = !!selected && cart.some((c) => c.planId === selected.id);
 
   function goCheckout() {
-    if (!selected) return;
+    if (!selected || !detail) return;
+    track('checkout_start', {
+      productTitle: detail.title,
+      slug: detail.slug,
+      planId: selected.id,
+      planName: selected.name,
+      price: selected.price,
+      currency: selected.currency,
+      source: 'product_detail',
+    });
     navigate(`/checkout/${selected.id}`);
   }
 
@@ -81,6 +99,14 @@ export default function ProductDetail() {
       planName: selected.name,
       periodMonths: selected.periodMonths,
       category: detail.category,
+    });
+    track('add_to_cart', {
+      productTitle: detail.title,
+      slug: detail.slug,
+      planId: selected.id,
+      planName: selected.name,
+      price: selected.price,
+      currency: selected.currency,
     });
     setAdded(true);
     setTimeout(() => setAdded(false), 1600);
@@ -122,7 +148,13 @@ export default function ProductDetail() {
       <div className="detail">
         <div className="detail-info">
           <div className="detail-hero">
-            <div className="big-logo"><Icon name={CATEGORY_ICON_NAME[detail.category] ?? 'box'} size={42} /></div>
+            <div className="big-logo">
+              {detail.meta?.brand ? (
+                <BrandIcon brand={detail.meta.brand} size={44} />
+              ) : (
+                <Icon name={CATEGORY_ICON_NAME[detail.category] ?? 'box'} size={42} />
+              )}
+            </div>
             <div>
               <h1>{detail.title}</h1>
               <div className="sub">

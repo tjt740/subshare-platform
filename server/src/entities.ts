@@ -376,6 +376,27 @@ export class SiteConfigRevision {
   @CreateDateColumn() createdAt: Date;
 }
 
+/** 埋点事件（PV/点击/下单漏斗/用户行为轨迹） */
+@Entity('analytics_events')
+export class AnalyticsEvent {
+  @PrimaryGeneratedColumn() id: number;
+  @Index()
+  @Column({ type: 'text' })
+  name: string;
+  @Index()
+  @Column({ type: 'integer', nullable: true })
+  userId: number | null;
+  @Column({ type: 'text', default: '' }) anonId: string;
+  @Column({ type: 'text', default: '' }) sessionId: string;
+  @Column({ type: 'text', default: '' }) path: string;
+  @Column({ type: 'text', default: '' }) referrer: string;
+  @Column({ type: 'text', default: '' }) device: string;
+  @Column({ type: 'text', default: '{}' }) props: string;
+  @Column({ type: 'text', default: '' }) ip: string;
+  @Column({ type: 'text', default: '' }) userAgent: string;
+  @CreateDateColumn() createdAt: Date;
+}
+
 export const ALL_ENTITIES = [
   User,
   Product,
@@ -397,6 +418,7 @@ export const ALL_ENTITIES = [
   SiteSetting,
   SiteConfigRevision,
   LoginLog,
+  AnalyticsEvent,
 ];
 
 export const REGIONS = ['US', 'EU', 'CN', 'GLOBAL'] as const;
@@ -456,4 +478,5 @@ export const ADMIN_PERMISSIONS = [
   'tickets',
   'suppliers',
   'settings',
+  'analytics',
 ] as const;

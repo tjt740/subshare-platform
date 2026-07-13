@@ -147,7 +147,8 @@ EOF
 sudo_cmd mv "$tmp_nginx" "$NGINX_CONF"
 
 sudo_cmd systemctl daemon-reload
-sudo_cmd systemctl enable --now "$SERVICE_NAME"
+sudo_cmd systemctl enable "$SERVICE_NAME"
+sudo_cmd systemctl restart "$SERVICE_NAME"
 sudo_cmd nginx -t
 sudo_cmd systemctl enable nginx
 sudo_cmd systemctl reload nginx || sudo_cmd systemctl restart nginx

@@ -39,7 +39,12 @@ const parseMeta = (m?: string) => {
 };
 
 const CAT_ICON: Record<string, string> = {
-  流媒体: '🎬', 音乐: '🎵', 'AI 工具': '🤖', 办公: '💼', 学习: '📚', 游戏: '🎮',
+  流媒体: '▶', 音乐: '♪', 'AI 工具': '✦', 办公: '▦', 学习: '✎', 游戏: '◆',
+};
+/** 品牌色（与前台 BrandIcon 对齐） */
+const BRAND_COLOR: Record<string, string> = {
+  chatgpt: '#10a37f', claude: '#d97757', elevenlabs: '#111111', notion: '#000000',
+  canva: '#00c4cc', figma: '#f24e1e', autocad: '#e51937', youtube: '#ff0000',
 };
 const CAT_TINT: Record<string, string> = {
   流媒体: '#fb9920', 音乐: '#5fc27e', 'AI 工具': '#8f7bf1', 办公: '#4fb8d8', 学习: '#ffcf3f', 游戏: '#ff5d8f',
@@ -145,6 +150,10 @@ export default function Products() {
   const [pricingPlan, setPricingPlan] = useState<PlanRow | null>(null);
   const [priceForm] = Form.useForm();
   const priceValues: any = Form.useWatch([], priceForm) || {};
+  const breakdownTotal = (region: string) => [
+    'costAmount', 'paymentFeeAmount', 'aftersalesReserveAmount',
+    'operationCostAmount', 'targetProfitAmount',
+  ].reduce((sum, name) => sum + Number(priceValues[`${name}_${region}`] || 0), 0);
 
   const loadProducts = useCallback(() => {
     setLoading(true);
@@ -654,13 +663,16 @@ export default function Products() {
                 ))}
               </Row>
               <div style={{ background: '#fff7e6', borderRadius: 8, padding: '9px 12px' }}>
-                <b>{priceValues[`currency_${region}`] || ''} {Number(priceValues[`price_${region}`] || 0).toFixed(2)}</b>
-                {' = '}
-                成本 {Number(priceValues[`costAmount_${region}`] || 0).toFixed(2)}
-                {' + '}手续费 {Number(priceValues[`paymentFeeAmount_${region}`] || 0).toFixed(2)}
-                {' + '}售后 {Number(priceValues[`aftersalesReserveAmount_${region}`] || 0).toFixed(2)}
-                {' + '}运营 {Number(priceValues[`operationCostAmount_${region}`] || 0).toFixed(2)}
-                {' + '}利润 {Number(priceValues[`targetProfitAmount_${region}`] || 0).toFixed(2)}
+                {breakdownTotal(region) > 0 ? <>
+                  <b>{priceValues[`currency_${region}`] || ''} {Number(priceValues[`price_${region}`] || 0).toFixed(2)}</b>
+                  {' = '}成本 {Number(priceValues[`costAmount_${region}`] || 0).toFixed(2)}
+                  {' + '}手续费 {Number(priceValues[`paymentFeeAmount_${region}`] || 0).toFixed(2)}
+                  {' + '}售后 {Number(priceValues[`aftersalesReserveAmount_${region}`] || 0).toFixed(2)}
+                  {' + '}运营 {Number(priceValues[`operationCostAmount_${region}`] || 0).toFixed(2)}
+                  {' + '}利润 {Number(priceValues[`targetProfitAmount_${region}`] || 0).toFixed(2)}
+                </> : <>
+                  当前售价 <b>{priceValues[`currency_${region}`] || ''} {Number(priceValues[`price_${region}`] || 0).toFixed(2)}</b>，尚未配置组成；填写任一组成项后将自动按公式重算。
+                </>}
               </div>
               <Form.Item name={`price_${region}`} hidden><InputNumber /></Form.Item>
             </Card>

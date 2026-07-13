@@ -37,6 +37,7 @@ import Suppliers from './pages/Suppliers';
 import Admins from './pages/Admins';
 import SupplierPortal from './pages/SupplierPortal';
 import SiteSettings from './pages/SiteSettings';
+import Analytics from './pages/Analytics';
 
 const { Header, Sider, Content } = Layout;
 
@@ -176,6 +177,7 @@ export default function App() {
         can('tickets') && { key: '/tickets', label: <Link to="/tickets">客服工单</Link> },
         can('suppliers') && { key: '/suppliers', label: <Link to="/suppliers">供应商审核</Link> },
         can('users') && { key: '/users', label: <Link to="/users">用户管理</Link> },
+        can('analytics') && { key: '/analytics', label: <Link to="/analytics">数据埋点</Link> },
         can('settings') && { key: '/settings', label: <Link to="/settings">站点设置</Link> },
         profile.role === 'super' && {
           key: '/admins',
@@ -242,6 +244,7 @@ export default function App() {
                 {can('tickets') && <Route path="/tickets" element={<Tickets />} />}
                 {can('suppliers') && <Route path="/suppliers" element={<Suppliers />} />}
                 {can('users') && <Route path="/users" element={<Users />} />}
+                {can('analytics') && <Route path="/analytics" element={<Analytics />} />}
                 {can('settings') && <Route path="/settings" element={<SiteSettings />} />}
                 {profile.role === 'super' && <Route path="/admins" element={<Admins />} />}
               </>

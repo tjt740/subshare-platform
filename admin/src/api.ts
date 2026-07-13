@@ -94,4 +94,5 @@ export const PERM_OPTIONS = [
   { value: 'tickets', label: '客服工单' },
   { value: 'suppliers', label: '供应商审核' },
   { value: 'settings', label: '站点设置' },
+  { value: 'analytics', label: '数据埋点' },
 ];

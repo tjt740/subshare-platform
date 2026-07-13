@@ -4,6 +4,7 @@ import { api, money, PROVIDERS, toUsd } from '../api';
 import { useApp } from '../store';
 import { useI18n } from '../i18n';
 import Icon, { CATEGORY_ICON_NAME } from '../components/Icon';
+import { track } from '../track';
 
 interface LineItem {
   planId: number;
@@ -99,6 +100,13 @@ export default function Checkout() {
   async function submit() {
     setSubmitting(true);
     setError('');
+    track('checkout_submit', {
+      items: lines!.length,
+      total,
+      currency,
+      provider,
+      productTitle: lines![0]?.productTitle,
+    });
     try {
       const order = await api<{ id: number }>('/orders', {
         method: 'POST',
@@ -115,6 +123,7 @@ export default function Checkout() {
         `/payments/${order.id}/checkout`,
         { method: 'POST', token, body: JSON.stringify({ provider }) },
       );
+      track('payment_start', { orderId: order.id, provider, total, currency });
       if (isCart) clearCart();
       if (provider === 'balance') refreshUser();
       navigate(`/pay/${res.paymentId}`);

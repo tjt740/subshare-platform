@@ -12,6 +12,7 @@ import { WalletModule } from './wallet/wallet.module';
 import { TicketsModule } from './tickets/tickets.module';
 import { SupplierModule } from './supplier/supplier.module';
 import { MiscController } from './misc/misc.controller';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 export const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
 
@@ -41,6 +42,7 @@ export const JWT_SECRET = process.env.JWT_SECRET || 'dev-secret-change-me';
     WalletModule,
     TicketsModule,
     SupplierModule,
+    AnalyticsModule,
   ],
   controllers: [MiscController],
 })

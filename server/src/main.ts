@@ -6,7 +6,7 @@ import { DataSource } from 'typeorm';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AppModule } from './app.module';
-import { ALL_ENTITIES, User } from './entities';
+import { ALL_ENTITIES, InventoryAccount, Order, SiteSetting, User } from './entities';
 import { runSeed } from './seed-data';
 
 const DB_FILE =
@@ -56,6 +56,52 @@ async function bootstrap() {
       // eslint-disable-next-line no-console
       console.log('[subshare] 检测到空数据库，自动写入种子数据…');
       await runSeed(ds);
+    }
+
+    // v10 数据补全只执行一次：拆分旧订单状态，并为旧库存生成可追踪编号。
+    const settingRepo = ds.getRepository(SiteSetting);
+    const migrated = await settingRepo.findOneBy({ key: 'migration_v10_finance' });
+    if (!migrated) {
+      const orderRepo = ds.getRepository(Order);
+      const legacyOrders = await orderRepo.find();
+      for (const order of legacyOrders) {
+        if (['paid', 'delivered', 'allocating'].includes(order.status)) {
+          order.paymentStatus = 'paid';
+        }
+        if (order.status === 'delivered') {
+          order.fulfillmentStatus = 'delivered';
+          order.deliveredAt =
+            order.deliveredAt || order.paidAt || order.createdAt;
+        } else if (order.status === 'allocating') {
+          order.fulfillmentStatus = 'partial';
+        }
+        if (order.status === 'refunded') {
+          order.paymentStatus = 'refunded';
+          order.refundStatus = 'refunded';
+          order.refundedAt =
+            order.refundedAt || order.updatedAt || order.createdAt;
+        }
+        await orderRepo.save(order);
+      }
+      const superUser = await ds.getRepository(User).findOneBy({ role: 'super' });
+      const accountRepo = ds.getRepository(InventoryAccount);
+      const legacyAccounts = await accountRepo.find();
+      for (const account of legacyAccounts) {
+        if (!account.accountCode) {
+          account.accountCode = `ACC-${String(account.id).padStart(6, '0')}`;
+        }
+        account.purchasedAt = account.purchasedAt || account.createdAt;
+        account.serviceStartedAt = account.serviceStartedAt || account.createdAt;
+        account.createdBy = account.createdBy || superUser?.id || null;
+        account.updatedBy = account.updatedBy || account.createdBy;
+        await accountRepo.save(account);
+      }
+      await settingRepo.save(
+        settingRepo.create({
+          key: 'migration_v10_finance',
+          value: new Date().toISOString(),
+        }),
+      );
     }
   } catch (err) {
     // eslint-disable-next-line no-console

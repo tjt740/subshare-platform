@@ -77,6 +77,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       .catch(() => undefined);
   }, []);
 
+  // 后台站点编辑器实时预览：仅影响当前 iframe 内存状态，不写数据库、不发布。
+  useEffect(() => {
+    const onPreview = (event: MessageEvent) => {
+      const allowed =
+        event.origin === window.location.origin ||
+        /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(event.origin);
+      if (!allowed || event.data?.type !== 'SUBSHARE_SITE_PREVIEW') return;
+      const config = event.data?.config;
+      if (config && typeof config === 'object' && !Array.isArray(config)) {
+        setSiteCfg(config);
+      }
+    };
+    window.addEventListener('message', onPreview);
+    return () => window.removeEventListener('message', onPreview);
+  }, []);
+
   useEffect(() => {
     if (!token) {
       setUser(null);
